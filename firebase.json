@@ -1,0 +1,13 @@
+{
+  "hosting": {
+    "public": "atlas",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      { "source": "/api/atlasChat", "function": "atlasChat" }
+    ]
+  }
+}
