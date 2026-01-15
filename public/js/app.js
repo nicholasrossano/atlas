@@ -749,6 +749,7 @@ function ensureIntroIfNeeded(trigger){
 const ATLAS_CHAT_ENDPOINT = (typeof window.ATLAS_CHAT_ENDPOINT === "string" && window.ATLAS_CHAT_ENDPOINT.trim().length > 0)
 	? window.ATLAS_CHAT_ENDPOINT.trim()
 	: "https://us-central1-ponder-f84ce.cloudfunctions.net/atlasChat";
+const ATLAS_CHAT_DEBUG = window.ATLAS_CHAT_DEBUG === true;
 
 const chatSessionId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`);
 
@@ -1156,6 +1157,7 @@ async function submitChat(rawText, trigger){
 			},
 			messages: buildChatHistoryForApi()
 		};
+		if (ATLAS_CHAT_DEBUG) payload.debug = true;
 
 		const response = await fetch(ATLAS_CHAT_ENDPOINT, {
 			method: "POST",
