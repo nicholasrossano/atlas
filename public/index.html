@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta
+		name="viewport"
+		content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no"
+		/>
+		<title>Ponder AI | Atlas of Queer Literature</title>
+		<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
+		<link rel="stylesheet" href="/styles.css" />
+		<script src="/config.js"></script>
+		<script type="module">
+			// ─────────── Section Header ───────────
+			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
+			const firebaseConfig = window.ATLAS_CONFIG?.firebase || null;
+			if (!firebaseConfig) {
+				console.warn("[atlas] Missing firebase config: set window.ATLAS_CONFIG.firebase in /config.js");
+			} else {
+				initializeApp(firebaseConfig);
+				window.FIREBASE_ATLAS_CONFIG = firebaseConfig;
+			}
+			window.ATLAS_CHAT_ENDPOINT = window.ATLAS_CONFIG?.atlas?.chatEndpoint || "";
+			window.ATLAS_CHAT_DEBUG = new URLSearchParams(window.location.search).get("atlasChatDebug") === "1";
+		</script>
+	</head>
+	<body>
+		<header class="atlas-header" aria-label="Map title">
+			<a class="atlas-home"
+				href="https://ponder-app.ai/"
+				aria-label="Go to Ponder home">
+				<svg class="atlas-home-icon" viewBox="0 0 24 24" aria-hidden="true">
+					<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
+				</svg>
+			</a>
+			<div class="atlas-head">
+				<h1 class="atlas-title">Atlas of Queer Literature</h1>
+				<div class="atlas-subtitle">Ponder AI</div>
+			</div>
+		</header>
+		
+		<aside id="atlas-info" class="atlas-info" aria-live="polite" aria-atomic="true">
+			<div class="atlas-info-row">
+				<span id="atlas-flag" class="atlas-flag" role="img" aria-label="Country flag">🏳️</span>
+				<span id="atlas-name" class="atlas-name">Country</span>
+			</div>
+			<div id="atlas-books" class="atlas-books"></div>
+			<div id="atlas-empty" class="atlas-empty" hidden>We don't have any books from this country yet. If you have one you'd recommend, please let us know <a href="https://forms.gle/ZwvqKmMmUNZfWrcd8" target="_blank" rel="noopener">here</a>.</div>
+		</aside>
+		
+
+		<div id="atlas-chat" class="atlas-chat is-collapsed" role="region" aria-label="Ask the Curator">
+			<div class="atlas-chat-shell">
+				<div class="atlas-chat-header">
+					<div class="atlas-chat-title">Ask the Curator</div>
+					<button id="atlas-chat-clear" class="atlas-chat-clear" type="button">Clear</button>
+				</div>
+				<div id="atlas-chat-thread" class="atlas-chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
+				<div class="atlas-chat-input-row" role="form" aria-label="Send a message">
+					<textarea id="atlas-chat-input" class="atlas-chat-input" rows="1" spellcheck="false" placeholder="Ask anything…"></textarea>
+					<button id="atlas-chat-send" class="atlas-chat-send" type="button" aria-label="Send message">Send</button>
+				</div>
+			</div>
+		</div>
+
+		
+		<div id="map" role="application" aria-label="World map highlighting countries on tap"></div>
+		
+		<script src="/vendor/maplibre-gl.js"></script>
+		<script type="module" src="/js/app.js?v=atlas-v11"></script>
+	</body>
+</html>
