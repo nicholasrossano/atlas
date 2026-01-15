@@ -24,6 +24,8 @@
 			
 			initializeApp(firebaseConfig);
 			window.FIREBASE_ATLAS_CONFIG = firebaseConfig;
+			window.ATLAS_CHAT_ENDPOINT = "https://us-central1-ponder-f84ce.cloudfunctions.net/atlasChat";
+			window.ATLAS_CHAT_DEBUG = new URLSearchParams(window.location.search).get("atlasChatDebug") === "1";
 		</script>
 	</head>
 	<body>
