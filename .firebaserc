@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "ponder-f84ce"
+  },
+  "targets": {
+    "ponder-f84ce": {
+      "hosting": {
+        "map": [
+          "ponder-map"
+        ]
+      }
+    }
+  }
+}
