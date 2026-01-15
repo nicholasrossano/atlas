@@ -748,7 +748,7 @@ function ensureIntroIfNeeded(trigger){
 
 const ATLAS_CHAT_ENDPOINT = (typeof window.ATLAS_CHAT_ENDPOINT === "string" && window.ATLAS_CHAT_ENDPOINT.trim().length > 0)
 	? window.ATLAS_CHAT_ENDPOINT.trim()
-	: "/api/atlasChat";
+	: "https://us-central1-ponder-f84ce.cloudfunctions.net/atlasChat";
 
 const chatSessionId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(16).slice(2)}`);
 
