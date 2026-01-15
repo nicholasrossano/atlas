@@ -9,22 +9,18 @@
 		<title>Ponder AI | Atlas of Queer Literature</title>
 		<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
 		<link rel="stylesheet" href="/styles.css" />
+		<script src="/config.js"></script>
 		<script type="module">
 			// ─────────── Section Header ───────────
 			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-			const firebaseConfig = {
-				apiKey: "AIzaSyBo53eMpGIRUV80PJAWMemyKzQ4_cDDtcA",
-				authDomain: "ponder-f84ce.firebaseapp.com",
-				projectId: "ponder-f84ce",
-				storageBucket: "ponder-f84ce.appspot.com",
-				messagingSenderId: "1070041172712",
-				appId: "1:1070041172712:web:2ad12d2af596903013575d",
-				measurementId: "G-KQ06TBG5MH"
-			};
-			
-			initializeApp(firebaseConfig);
-			window.FIREBASE_ATLAS_CONFIG = firebaseConfig;
-			window.ATLAS_CHAT_ENDPOINT = "https://us-central1-ponder-f84ce.cloudfunctions.net/atlasChat";
+			const firebaseConfig = window.ATLAS_CONFIG?.firebase || null;
+			if (!firebaseConfig) {
+				console.warn("[atlas] Missing firebase config: set window.ATLAS_CONFIG.firebase in /config.js");
+			} else {
+				initializeApp(firebaseConfig);
+				window.FIREBASE_ATLAS_CONFIG = firebaseConfig;
+			}
+			window.ATLAS_CHAT_ENDPOINT = window.ATLAS_CONFIG?.atlas?.chatEndpoint || "";
 			window.ATLAS_CHAT_DEBUG = new URLSearchParams(window.location.search).get("atlasChatDebug") === "1";
 		</script>
 	</head>

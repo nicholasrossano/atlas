@@ -2,10 +2,27 @@
 console.log("[atlas] app.js v16 booting");
 
 // ─────────── Section Header ───────────
-const MAPTILER_KEY = "pJYwuyZdJSSP0jFB9417";
-const STYLE_ID     = "01980f6a-69a6-7821-b823-3068a302cdb6";
-const API_ROOT     = "https://api.maptiler.com";
-const STYLE_URL    = `${API_ROOT}/maps/${STYLE_ID}/style.json?key=${MAPTILER_KEY}`;
+const atlasConfig = window.ATLAS_CONFIG || {};
+const maptilerConfig = atlasConfig.maptiler || {};
+
+// ─────────── Section Header ───────────
+const MAPTILER_KEY = maptilerConfig.apiKey || "";
+const STYLE_ID     = maptilerConfig.styleId || "";
+const API_ROOT     = maptilerConfig.apiRoot || "https://api.maptiler.com";
+const STYLE_URL    = MAPTILER_KEY && STYLE_ID
+	? `${API_ROOT}/maps/${STYLE_ID}/style.json?key=${MAPTILER_KEY}`
+	: "";
+const FALLBACK_STYLE = {
+	version: 8,
+	sources: {},
+	layers: [
+		{
+			id: "background",
+			type: "background",
+			paint: { "background-color": "#f6f2ec" }
+		}
+	]
+};
 const SOURCE_ID    = "countries";
 const SOURCE_LAYER = "administrative";
 const HIGHLIGHT_COLOR = "#301900";
@@ -14,6 +31,10 @@ const MIN_ZOOM = 1, MAX_ZOOM = 1.8, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
 const MIN_LAT = -60, MAX_LAT = 85;
 const ZOOM_LABEL_SWITCH = 2.0;
 const show = (msg, ...rest) => console.log(`[map] ${msg}`, ...rest);
+
+if (!MAPTILER_KEY || !STYLE_ID) {
+	console.warn("[atlas] Missing MapTiler config: set window.ATLAS_CONFIG.maptiler in /config.js");
+}
 
 // ─────────── Section Header ───────────
 function ensureKey(url){ return url.includes("key=") ? url : `${url}${url.includes("?") ? "&" : "?"}key=${MAPTILER_KEY}`; }
@@ -34,7 +55,7 @@ maplibregl.addProtocol("maptiler", async (params, abortController) => {
 // ─────────── Section Header ───────────
 const map = new maplibregl.Map({
 	container: "map",
-	style: STYLE_URL,
+	style: STYLE_URL || FALLBACK_STYLE,
 	center: INITIAL_CENTER,
 	zoom: INITIAL_ZOOM,
 	minZoom: MIN_ZOOM,
