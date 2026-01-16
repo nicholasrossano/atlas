@@ -1,18 +1,13 @@
-# Ponder Map
+# Atlas of Queer Literature
 
-Ponder Map connects queer readers to queer literature through an AI assistant and an interactive map. The assistant helps folks discover books, authors, and stories that resonate, while the map makes it easy to explore titles by place, theme, and community context. You can check out the live map here: https://map.ponder-app.ai
+The Atlas of Queer Literature connects queer readers to queer literature through an interactive map and an AI assistant. The assistant helps readers discover books, authors, and stories that resonate, while the map makes it easy to explore titles from around the world. You can check out the [live map here](https://map.ponder-app.ai).
 
 ## What it does
 
 - **AI-guided discovery:** An assistant that helps readers find LGBTQ+ books and authors based on interests, identity, and vibe.
 - **Map-first exploration:** Browse literature spatially to surface local voices, settings, and queer communities.
-- **Community powered:** Anyone can suggest new books for inclusion.
-
-## Submit a book
-
-Got a title we should add? Please use this form to submit new books:
-
-- https://docs.google.com/forms/d/15BKFUz_xo4XAJsz1HcuX45PZ3gK1a8eNohRjl9CXVK8/edit#responses
+- **Community powered:** Anyone can suggest new books for inclusion. Our current library is based on our own libraries, personal recommendations, and community submissions.
+- **AI-driven features:** We used genAI to write summaries about what is specifically queer about the book to help readers know what to expect.
 
 ## Roadmap ideas
 
@@ -25,5 +20,7 @@ Here are some of the things we want to build next:
 - **Broader categories** (potentially adding new top-level collections beyond LGBTQ literature).
 
 ## Contributing
+
+Know of other books we should add? Please use this [Google Form](https://forms.gle/2EAUz7nf3pGPdM8z7) to submit new books.
 
 PRs and suggestions are welcome. If you have feedback, ideas, or want to help, open an issue or submit a book via the form above.
