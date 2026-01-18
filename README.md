@@ -11,7 +11,7 @@ This atlas connects queer readers to queer literature through an interactive map
 
 ## Roadmap
 
-Here are some of the things we want to build next:
+Future plans include:
 
 - **Richer book detail pages** (additional metadata, themes, content notes, reviews, and reading levels).
 - **Smarter assistant** (better recommendations, improved filtering, and more nuanced guidance).
@@ -21,6 +21,6 @@ Here are some of the things we want to build next:
 
 ## Contributions
 
-Know of other books we should add? Please use this [Google Form](https://forms.gle/2EAUz7nf3pGPdM8z7) to submit new books.
+If you have books you'd like to add, please use this [Google Form](https://forms.gle/2EAUz7nf3pGPdM8z7) to submit new books.
 
-PRs and suggestions are welcome. If you have feedback, ideas, or want to help, open an issue or submit a book via the form above.
+PRs and suggestions are also welcome! If you have feedback, ideas, or want to help, open an issue or submit a book via the form above.
