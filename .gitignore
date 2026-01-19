@@ -72,7 +72,7 @@ node_modules/
 # Local runtime config
 public/config.js
 
-# ─────────── Firebase Functions env + secrets ───────────
+# Firebase Functions env + secrets
 # Firebase Functions now loads env files from functions/ (and can auto-create .env.<projectId>)
 .env.*
 !.env.example
@@ -86,21 +86,33 @@ functions/.env.*
 functions/.secret.local
 functions/.secret.*.local
 
-# ─────────── Emulator persisted data (if you use --import/--export-on-exit) ───────────
 emulator-data/
 firebase-export/
 saved-data/
 
-# ─────────── TypeScript build artifacts (only if you chose TS) ───────────
 functions/lib/
 functions/dist/
 *.tsbuildinfo
 
-# ─────────── Keys you never want in git ───────────
 serviceAccount*.json
 firebase-adminsdk*.json
 *.pem
 *.p12
 
-# ─────────── OS junk ───────────
 .DS_Store
+
+# Python virtualenvs
+venv/
+.venv/
+functions/venv/
+functions/.venv/
+
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/.DS_Store
