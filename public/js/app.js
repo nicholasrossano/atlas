@@ -1,3 +1,5 @@
+// Atlas/public/js/app.js
+
 // ─────────── Section Header ───────────
 console.log("[atlas] app.js v16 booting");
 
@@ -23,13 +25,21 @@ const FALLBACK_STYLE = {
 		}
 	]
 };
+
 const SOURCE_ID    = "countries";
 const SOURCE_LAYER = "administrative";
+
 const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
-const MIN_ZOOM = 1, MAX_ZOOM = 1.8, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
+const BORDER_COLOR = "#FEFCF6";
+
+const MIN_ZOOM = 1, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
 const MIN_LAT = -60, MAX_LAT = 85;
 const ZOOM_LABEL_SWITCH = 2.0;
+
+const SELECT_ZOOM = 2.5;
+const SELECT_DURATION_MS = 650;
+
 const show = (msg, ...rest) => console.log(`[map] ${msg}`, ...rest);
 
 if (!MAPTILER_KEY || !STYLE_ID) {
@@ -88,8 +98,13 @@ document.addEventListener("visibilitychange", () => requestAnimationFrame(hardRe
 
 // ─────────── Section Header ───────────
 const FADE_LAYER_ID="oly-fade", AVAIL_LAYER_ID="oly-avail", HIGHLIGHT_LAYER_ID="oly-hi", LABEL_LAYER_ID="oly-label", HITBOX_LAYER_ID="oly-hit";
+const LABEL_SOURCE_ID="oly-label-src";
+
+const COUNTRY_LEVEL = 0;
+const COUNTRY_BASE_FILTER = ["all", ["==", ["get","level"], COUNTRY_LEVEL], ["!=", ["get","iso_a2"], "AQ"]];
+
 let selectedIso = null;
-let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[];
+let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[], otherLabelLayerIds=[];
 
 // ─────────── Section Header ───────────
 const infoBox   = document.getElementById("atlas-info");
@@ -108,9 +123,16 @@ function isoToFlagEmoji(iso2){
 	return String.fromCodePoint(base+a, base+b);
 }
 function fullCountryName(iso, propName){
+	const cleanIso = (typeof iso === "string") ? iso.trim().toUpperCase() : "";
+	try {
+		if (cleanIso && cleanIso.length === 2){
+			const dn = regionNames.of(cleanIso);
+			if (dn && dn.trim()) return dn.trim();
+		}
+	} catch {}
+
 	if (propName && typeof propName === "string" && propName.trim().length > 2) return propName.trim();
-	try { const dn = regionNames.of(iso); if (dn && dn.trim()) return dn; } catch {}
-	return propName || iso || "—";
+	return cleanIso || propName || "—";
 }
 function escapeHtml(str){
 	return String(str || "").replace(/[&<>"']/g, ch => {
@@ -128,8 +150,8 @@ function escapeHtml(str){
 // ─────────── Section Header ───────────
 const STUB_EVERYWHERE = false;
 const PLACEHOLDER_COVER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
-																		  `<svg xmlns="http://www.w3.org/2000/svg" width="68" height="102"><rect width="100%" height="100%" fill="#eae7df"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="10" fill="#888">No Cover</text></svg>`
-																		  );
+	`<svg xmlns="http://www.w3.org/2000/svg" width="68" height="102"><rect width="100%" height="100%" fill="#eae7df"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="10" fill="#888">No Cover</text></svg>`
+);
 
 // ─────────── Section Header ───────────
 let _db = null;
@@ -137,25 +159,26 @@ const BOOKS_COLLECTION = "atlasBooks";
 let _allBooksPromise = null;
 const _booksByIsoCache = new Map();
 let _availableIsoList = [];
+
 async function ensureFirestore(){
 	if (_db) return _db;
-	
+
 	if (window.firebase?.apps?.length) {
 		_db = window.firebase.firestore();
 		console.log("[atlas] Firestore ready (compat)");
 		return _db;
 	}
-	
+
 	const cfg = (window.FIREBASE_ATLAS_CONFIG && typeof window.FIREBASE_ATLAS_CONFIG === "object") ? window.FIREBASE_ATLAS_CONFIG : null;
 	if (!cfg) {
 		console.warn("[atlas] Firestore not configured: set window.FIREBASE_ATLAS_CONFIG or load Firebase before app.js");
 		return null;
 	}
-	
+
 	const load = (src) => new Promise((res, rej) => { const s=document.createElement("script"); s.src=src; s.onload=res; s.onerror=rej; document.head.appendChild(s); });
 	await load("https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js");
 	await load("https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore-compat.js");
-	
+
 	if (!window.firebase?.apps?.length) window.firebase.initializeApp(cfg);
 	_db = window.firebase.firestore();
 	console.log("[atlas] Firestore ready (compat)");
@@ -208,7 +231,7 @@ function hasTokenMatch(tokens, candidates){
 // ─────────── Section Header ───────────
 async function loadAllBooks(db){
 	if (_allBooksPromise) return _allBooksPromise;
-	
+
 	_allBooksPromise = (async () => {
 		try {
 			const snapshot = await db.collection(BOOKS_COLLECTION).get();
@@ -217,8 +240,8 @@ async function loadAllBooks(db){
 				const data = doc.data() || {};
 				const summary = typeof data.summary === "string" ? data.summary : "";
 				const bookshopUrl = (typeof data.bookshop_url === "string" && data.bookshop_url.trim())
-				? data.bookshop_url
-				: (typeof data.bookshop === "string" ? data.bookshop : "");
+					? data.bookshop_url
+					: (typeof data.bookshop === "string" ? data.bookshop : "");
 				records.push({
 					id: doc.id,
 					title: data.title || "",
@@ -226,10 +249,7 @@ async function loadAllBooks(db){
 					cover_url: data.cover_url || "",
 					summary,
 					bookshop_url: bookshopUrl,
-					overrideTokens: normalizeTokenList(data.country_override),
-					settingTokens: normalizeTokenList(data.setting_country),
-					authorCountryTokens: normalizeTokenList(data.author_country),
-					authorOriginTokens: normalizeTokenList(data.author_origin)
+					overrideTokens: normalizeTokenList(data.country_override)
 				});
 			});
 			console.log(`[atlas] cached ${records.length} book(s) from ${BOOKS_COLLECTION}`);
@@ -239,7 +259,7 @@ async function loadAllBooks(db){
 			throw err;
 		}
 	})();
-	
+
 	return _allBooksPromise;
 }
 
@@ -247,34 +267,27 @@ async function loadAllBooks(db){
 function computeAvailableIsoList(records){
 	const out = new Set();
 	for (const rec of records){
-		if (rec.overrideTokens && rec.overrideTokens.length){
-			for (const t of rec.overrideTokens) if (t && t.length === 2) out.add(t);
-			continue;
+		for (const t of (rec.overrideTokens || [])){
+			if (t && typeof t === "string" && t.length === 2) out.add(t.toUpperCase());
 		}
-		if (rec.settingTokens && rec.settingTokens.length){
-			for (const t of rec.settingTokens) if (t && t.length === 2) out.add(t);
-			continue;
-		}
-		for (const t of (rec.authorCountryTokens || [])) if (t && t.length === 2) out.add(t);
-		for (const t of (rec.authorOriginTokens || []))  if (t && t.length === 2) out.add(t);
 	}
 	const arr = Array.from(out).filter(iso => iso !== "AQ").sort();
 	return arr;
 }
 
-function availabilityPaintExpr(list){
+// ─────────── Section Header ───────────
+function availabilityPaintExpr(){
 	return [
 		"case",
 		["==", ["get","iso_a2"], "AQ"], "rgba(0,0,0,0)",
-		["in", ["get","iso_a2"], ["literal", list]], HIGHLIGHT_COLOR,
-		BLUSH_COLOR
+		HIGHLIGHT_COLOR
 	];
 }
 
 function updateAvailabilityStyle(){
 	if (!map.getLayer(AVAIL_LAYER_ID)) return;
 	try {
-		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr(_availableIsoList));
+		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr());
 	} catch(_) {}
 }
 
@@ -283,23 +296,23 @@ async function fetchBooksByCountry(iso2){
 	const candidates = isoCandidates(iso2);
 	const ISO = candidates[0];
 	const db = await ensureFirestore();
-	
+
 	if (!db) {
 		if (STUB_EVERYWHERE) {
 			return [{ title:"Lie with Me", author:"Philippe Besson", cover_url:"https://books.google.com/books/content?id=rvePDwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api" }];
 		}
 		return [];
 	}
-	
+
 	if (!ISO) return [];
-	
+
 	const cached = _booksByIsoCache.get(ISO);
 	if (cached) return cached;
-	
+
 	const compute = async () => {
 		const normalizedCandidates = Array.from(new Set(candidates.map(normalizeCountryToken).filter(Boolean)));
 		if (!normalizedCandidates.length) return [];
-		
+
 		let records = [];
 		try {
 			records = await loadAllBooks(db);
@@ -307,23 +320,14 @@ async function fetchBooksByCountry(iso2){
 			console.error("[atlas] Failed to load book cache:", err);
 			throw err;
 		}
-		
-		const items = records.filter(rec => {
-			if (hasTokenMatch(rec.overrideTokens, normalizedCandidates)) return true;
-			const hasSetting = rec.settingTokens && rec.settingTokens.length > 0;
-			if (hasTokenMatch(rec.settingTokens, normalizedCandidates)) return true;
-			if (!hasSetting) {
-				if (hasTokenMatch(rec.authorCountryTokens, normalizedCandidates)) return true;
-				if (hasTokenMatch(rec.authorOriginTokens, normalizedCandidates)) return true;
-			}
-			return false;
-		});
-		
+
+		const items = records.filter(rec => hasTokenMatch(rec.overrideTokens || [], normalizedCandidates));
+
 		items.sort((a,b)=>String(a.title||"").localeCompare(String(b.title||"")));
 		console.log("[atlas] fetched", items.length, "book(s) for", ISO, "from cache");
 		return items;
 	};
-	
+
 	const promise = compute().catch(err => {
 		_booksByIsoCache.delete(ISO);
 		throw err;
@@ -332,14 +336,15 @@ async function fetchBooksByCountry(iso2){
 	return promise;
 }
 
+// ─────────── Section Header ───────────
 function renderBooks(items, iso){
 	if (!booksList || !emptyMsg) return;
-	
+
 	lastBooksIso = iso;
 	lastBooksItems = Array.isArray(items) ? items.slice() : [];
 	selectedBook = null;
 	if (infoBox) infoBox.classList.remove("is-book-detail");
-	
+
 	if (!Array.isArray(items) || items.length === 0){
 		booksList.innerHTML = "";
 		booksList.hidden = true;
@@ -347,7 +352,7 @@ function renderBooks(items, iso){
 		console.log("[atlas] empty list for", iso);
 		return;
 	}
-	
+
 	const html = items.map((it, idx) => {
 		const title = String(it.title || "").trim() || "Untitled";
 		const author = String(it.author || "").trim() || "Unknown";
@@ -363,25 +368,25 @@ function renderBooks(items, iso){
    </div>
  `;
 	}).join("");
-	
+
 	booksList.innerHTML = html;
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
-	
+
 	[...booksList.querySelectorAll(".atlas-book-cover")].forEach(img=>{
 		img.addEventListener("error", ()=>{ img.src = PLACEHOLDER_COVER; }, { once: true });
 		if (!img.getAttribute("src")) img.src = PLACEHOLDER_COVER;
 	});
-	
+
 	console.log("[atlas] rendered", items.length, "book(s) for", iso);
 }
 
 function showBookDetail(book, iso){
 	if (!booksList || !emptyMsg || !book) return;
-	
+
 	selectedBook = book;
 	if (infoBox) infoBox.classList.add("is-book-detail");
-	
+
 	const title = String(book.title || "").trim() || "Untitled";
 	const author = String(book.author || "").trim() || "Unknown";
 	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
@@ -390,12 +395,12 @@ function showBookDetail(book, iso){
 	const hasSummary = summary.length > 0;
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
 	const hasBuy = rawBuyUrl.length > 0;
-	
+
 	let buyButtonHtml = "";
 	if (hasBuy){
 		buyButtonHtml = `<a class="atlas-book-buy" href="${escapeHtml(rawBuyUrl)}" target="_blank" rel="noopener">Buy</a>`;
 	}
-	
+
 	let summaryHtml = "";
 	if (hasSummary){
 		summaryHtml = `
@@ -404,7 +409,7 @@ function showBookDetail(book, iso){
   </div>
   `;
 	}
-	
+
 	const html = `
   <div class="atlas-book-detail">
   <div class="atlas-book-detail-header">
@@ -425,17 +430,17 @@ function showBookDetail(book, iso){
   ${summaryHtml}
   </div>
   `;
-	
+
 	booksList.innerHTML = html;
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
-	
+
 	const coverImg = booksList.querySelector(".atlas-book-detail-cover");
 	if (coverImg){
 		coverImg.addEventListener("error", ()=>{ coverImg.src = PLACEHOLDER_COVER; }, { once: true });
 		if (!coverImg.getAttribute("src")) coverImg.src = PLACEHOLDER_COVER;
 	}
-	
+
 	const backButton = booksList.querySelector(".atlas-book-back");
 	if (backButton){
 		backButton.addEventListener("click", () => {
@@ -444,7 +449,7 @@ function showBookDetail(book, iso){
 			requestAnimationFrame(placeInfoChip);
 		});
 	}
-	
+
 	requestAnimationFrame(placeInfoChip);
 }
 
@@ -474,7 +479,7 @@ function placeInfoChip(){
 	if (!infoBox.classList.contains("is-visible")) return;
 	if (document.body.classList.contains("atlas-chat-expanded")) return;
 	if (infoBox.classList.contains("is-suppressed")) return;
-	
+
 	if (isMobile()) {
 		if (searchInner) {
 			const sh = Math.ceil(searchInner.getBoundingClientRect().height) || 56;
@@ -483,11 +488,11 @@ function placeInfoChip(){
 		infoBox.classList.add("stacked");
 		return;
 	}
-	
+
 	if (!searchInner) { infoBox.classList.remove("stacked"); return; }
 	const sh = Math.ceil(searchInner.getBoundingClientRect().height) || 56;
 	infoBox.style.setProperty("--atlas-search-h", `${sh}px`);
-	
+
 	const infoRect   = infoBox.getBoundingClientRect();
 	const searchRect = searchInner.getBoundingClientRect();
 	if (rectsOverlap(infoRect, searchRect)) infoBox.classList.add("stacked");
@@ -497,15 +502,15 @@ function showInfo(iso,name){
 	infoFlag.textContent = isoToFlagEmoji(iso);
 	infoName.textContent = name || iso || "—";
 	if (infoBox) infoBox.classList.remove("is-book-detail");
-	
+
 	if (isMobile()) clearSuggestions();
-	
+
 	booksList.innerHTML = `<div class="atlas-loading">Loading…</div>`;
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
 	infoBox.classList.add("is-visible");
 	requestAnimationFrame(placeInfoChip);
-	
+
 	lastBooksIso = iso;
 	fetchBooksByCountry(iso)
 	.then(items => { if (iso === lastBooksIso) renderBooks(items, iso); })
@@ -524,6 +529,8 @@ function hideInfo(){
 const setVisibility=(ids,vis)=>ids.forEach(id=>{ if(map.getLayer(id)) map.setLayoutProperty(id,"visibility",vis); });
 const applyLabelModeForZoom=()=>{ if(selectedIso) return;
 	const showContinents = map.getZoom() < ZOOM_LABEL_SWITCH;
+
+	if (otherLabelLayerIds.length)     setVisibility(otherLabelLayerIds,     "none");
 	if (continentLabelLayerIds.length) setVisibility(continentLabelLayerIds, showContinents ? "visible":"none");
 	if (countryLabelLayerIds.length)   setVisibility(countryLabelLayerIds,   showContinents ? "none":"visible");
 };
@@ -544,7 +551,7 @@ function bboxOfFeature(feature) {
 		if (y < minY) minY = y;
 		if (y > maxY) maxY = y;
 	}
-	if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return [[-10,-10],[10,-10]];
+	if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) return null;
 	return [[minX,minY],[maxX,maxY]];
 }
 function clampBoundsLat(bounds) {
@@ -555,6 +562,7 @@ function clampBoundsLat(bounds) {
 }
 function centerOnFeature(feature) {
 	const raw = bboxOfFeature(feature);
+	if (!raw) return;
 	const clamped = clampBoundsLat(raw);
 	map.fitBounds(clamped, {
 		padding: { top: 90, right: 90, bottom: 100, left: 90 },
@@ -576,34 +584,209 @@ function centerOnBounds(bbox) {
 }
 
 // ─────────── Section Header ───────────
+const EMPTY_LABEL_FC = { type:"FeatureCollection", features: [] };
+
+function clearSelectedLabel(){
+	try {
+		const src = map.getSource(LABEL_SOURCE_ID);
+		if (src && typeof src.setData === "function") src.setData(EMPTY_LABEL_FC);
+	} catch(_) {}
+	try { if (map.getLayer(LABEL_LAYER_ID)) map.setLayoutProperty(LABEL_LAYER_ID, "visibility", "none"); } catch(_) {}
+}
+
+function clampLat(lat){
+	return Math.max(MIN_LAT, Math.min(MAX_LAT, lat));
+}
+
+function clampZoom(z){
+	return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+}
+
+function setSelectedLabelPoint(lng, lat, labelText){
+	const name = String(labelText || "").trim();
+	if (!name) return false;
+
+	const fc = {
+		type: "FeatureCollection",
+		features: [
+			{
+				type: "Feature",
+				properties: { name },
+				geometry: { type: "Point", coordinates: [lng, clampLat(lat)] }
+			}
+		]
+	};
+
+	try {
+		const src = map.getSource(LABEL_SOURCE_ID);
+		if (src && typeof src.setData === "function") src.setData(fc);
+		if (map.getLayer(LABEL_LAYER_ID)) map.setLayoutProperty(LABEL_LAYER_ID, "visibility", "visible");
+		return true;
+	} catch(_) {}
+	return false;
+}
+
+function extractLabelPointFromProps(props){
+	if (!props || typeof props !== "object") return null;
+	const pairs = [
+		["label_x","label_y"],
+		["label_lon","label_lat"],
+		["label_lng","label_lat"],
+		["centroid_x","centroid_y"],
+		["center_x","center_y"],
+		["lon","lat"],
+		["lng","lat"],
+		["x","y"]
+	];
+	for (const [kx, ky] of pairs){
+		const x = Number(props[kx]);
+		const y = Number(props[ky]);
+		if (Number.isFinite(x) && Number.isFinite(y)) return [x, y];
+	}
+	return null;
+}
+
+function unionBboxForIso(iso){
+	const clean = String(iso || "").toUpperCase();
+	let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+	let did = false;
+
+	let feats = [];
+	try {
+		feats = map.querySourceFeatures(SOURCE_ID, { sourceLayer: SOURCE_LAYER }) || [];
+	} catch(_) {
+		feats = [];
+	}
+
+	for (const f of feats){
+		const v = String(f?.properties?.iso_a2 || "").toUpperCase();
+		if (v !== clean) continue;
+
+		const rawLevel = f?.properties?.level;
+		const lvl = (typeof rawLevel === "number") ? rawLevel : Number(rawLevel);
+		if (lvl !== COUNTRY_LEVEL) continue;
+
+		const props = f?.properties || {};
+		const pt = extractLabelPointFromProps(props);
+		if (pt) return { point: pt, bbox: null };
+
+		const bb = bboxOfFeature(f);
+		if (!bb) continue;
+		const [[w,s],[e,n]] = bb;
+
+		minX = Math.min(minX, w);
+		minY = Math.min(minY, s);
+		maxX = Math.max(maxX, e);
+		maxY = Math.max(maxY, n);
+		did = true;
+	}
+
+	if (!did) return { point: null, bbox: null };
+	return { point: [(minX + maxX) / 2, (minY + maxY) / 2], bbox: [[minX, minY], [maxX, maxY]] };
+}
+
+function labelPointForIso(iso){
+	const res = unionBboxForIso(iso);
+	return res.point;
+}
+
+function easeToSelectionPoint(pointLngLat){
+	if (!pointLngLat || pointLngLat.length !== 2) return;
+	const lng = pointLngLat[0];
+	const lat = clampLat(pointLngLat[1]);
+	map.easeTo({
+		center: [lng, lat],
+		zoom: clampZoom(SELECT_ZOOM),
+		duration: SELECT_DURATION_MS
+	});
+}
+
+function updateSelectedLabelAndPoint(iso, name, fallbackFeature){
+	const labelText = String(name || "").trim() || fullCountryName(iso, "");
+
+	const fallbackPropsPt = extractLabelPointFromProps(fallbackFeature?.properties || null);
+	if (fallbackPropsPt && fallbackPropsPt.length === 2){
+		setSelectedLabelPoint(fallbackPropsPt[0], fallbackPropsPt[1], labelText);
+		return fallbackPropsPt;
+	}
+
+	const pt = labelPointForIso(iso);
+	if (pt && pt.length === 2){
+		setSelectedLabelPoint(pt[0], pt[1], labelText);
+		return pt;
+	}
+
+	const bb = bboxOfFeature(fallbackFeature);
+	if (bb){
+		const [[w,s],[e,n]] = bb;
+		const mid = [(w+e)/2, (s+n)/2];
+		setSelectedLabelPoint(mid[0], mid[1], labelText);
+		return mid;
+	}
+
+	return null;
+}
+
+// ─────────── Section Header ───────────
 const resetSelection=()=>{ selectedIso=null; const none=["==",["get","iso_a2"],"__none__"];
-	[HIGHLIGHT_LAYER_ID, LABEL_LAYER_ID].forEach(id=>{ if(map.getLayer(id)){ map.setFilter(id,none); map.setLayoutProperty(id,"visibility","none"); }});
-	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID,["!=",["get","iso_a2"],"AQ"]); }
+	if(map.getLayer(HIGHLIGHT_LAYER_ID)){ map.setFilter(HIGHLIGHT_LAYER_ID,none); map.setLayoutProperty(HIGHLIGHT_LAYER_ID,"visibility","none"); }
+	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID, COUNTRY_BASE_FILTER); }
+	clearSelectedLabel();
 	if(map.getLayer(AVAIL_LAYER_ID)){ map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","visible"); }
-	setVisibility(borderLineLayerIds,"visible"); setVisibility(baseLabelLayerIds,"visible");
-	applyLabelModeForZoom(); hideInfo(); };
+	setVisibility(baseLabelLayerIds,"visible");
+	applyLabelModeForZoom();
+	hideInfo();
+};
 
 function selectIso(iso, name, options){
 	if (chatIsExpanded) collapseChat("map_pick", { force: true, preserve: true });
 	const opts = (options && typeof options === "object") ? options : {};
 	const shouldShowInfo = !(opts.showInfo === false);
 	const allowToggle = (opts.allowToggle !== false);
+	const pickedFeature = opts.feature || null;
+
 	if(!iso||iso==="AQ"){ resetSelection(); return; }
 	if(allowToggle && iso===selectedIso){ resetSelection(); return; }
 	selectedIso=iso;
-	const highlightFilter=["==",["get","iso_a2"],iso];
-	const fadeFilter=["all",["!=",["get","iso_a2"],iso],["!=",["get","iso_a2"],"AQ"]];
+
+	const highlightFilter=["all",
+		["==", ["get","level"], COUNTRY_LEVEL],
+		["==",["get","iso_a2"],iso]
+	];
+
+	const fadeFilter=["all",
+		["==", ["get","level"], COUNTRY_LEVEL],
+		["!=",["get","iso_a2"],iso],
+		["!=",["get","iso_a2"],"AQ"]
+	];
+
 	map.setFilter(HIGHLIGHT_LAYER_ID,highlightFilter);
-	map.setFilter(LABEL_LAYER_ID,highlightFilter);
 	map.setFilter(FADE_LAYER_ID,fadeFilter);
+
 	map.setLayoutProperty(HIGHLIGHT_LAYER_ID,"visibility","visible");
-	map.setLayoutProperty(LABEL_LAYER_ID,"visibility","visible");
 	map.setLayoutProperty(FADE_LAYER_ID,"visibility","visible");
+
 	if(map.getLayer(AVAIL_LAYER_ID)) map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","none");
+
 	setVisibility(baseLabelLayerIds,"none");
-	setVisibility(borderLineLayerIds,"none");
 	clearSuggestions();
-	if (shouldShowInfo) showInfo(iso,name);
+
+	const labelText = String(name || "").trim() || fullCountryName(iso, "");
+	const pt = updateSelectedLabelAndPoint(iso, labelText, pickedFeature);
+
+	if (pt) {
+		easeToSelectionPoint(pt);
+	} else {
+		const attempt = () => {
+			const p2 = updateSelectedLabelAndPoint(iso, labelText, pickedFeature);
+			if (p2) easeToSelectionPoint(p2);
+			return !!p2;
+		};
+		try { map.once("idle", () => { attempt(); }); } catch(_) {}
+		setTimeout(() => { attempt(); }, 350);
+	}
+
+	if (shouldShowInfo) showInfo(iso,labelText);
 }
 
 function handlePickAtPoint(point){
@@ -612,10 +795,9 @@ function handlePickAtPoint(point){
 	if(hit.length){
 		const f   = hit[0];
 		const iso = f?.properties?.iso_a2;
-		const propName = f?.properties?.name_en ?? f?.properties?.NAME ?? f?.properties?.ADMIN ?? f?.properties?.name;
+		const propName = f?.properties?.name ?? f?.properties?.name_en ?? f?.properties?.NAME ?? f?.properties?.ADMIN;
 		const nice = fullCountryName(iso, propName);
-		selectIso(iso, nice);
-		centerOnFeature(f);
+		selectIso(iso, nice, { feature: f });
 		requestAnimationFrame(placeInfoChip);
 	} else {
 		resetSelection();
@@ -625,65 +807,101 @@ function handlePickAtPoint(point){
 // ─────────── Section Header ───────────
 map.on("load",()=>{ show("Map load OK"); hardResize();
 	if(!map.getSource(SOURCE_ID)){ show(`Missing source '${SOURCE_ID}'`); return; }
-	
+
 	map.getStyle().layers.forEach(layer=>{
-		if(layer.id.startsWith("oly-")) return;
+		if(!layer?.id || layer.id.startsWith("oly-")) return;
+
+		if (layer.source === SOURCE_ID){
+			try { map.setLayoutProperty(layer.id, "visibility", "none"); } catch(_) {}
+			return;
+		}
+
 		if(layer.type==="symbol"){
 			baseLabelLayerIds.push(layer.id);
 			const s=(layer["source-layer"]||"").toLowerCase(), id=(layer.id||"").toLowerCase();
 			if(s.includes("continent")||id.includes("continent")) continentLabelLayerIds.push(layer.id);
 			else if(s.includes("country")||id.includes("country")) countryLabelLayerIds.push(layer.id);
+			else otherLabelLayerIds.push(layer.id);
 		}
 		if(layer.type==="line" && typeof layer["source-layer"]==="string" &&
 		   layer["source-layer"].toLowerCase().startsWith("boundary")){
 			borderLineLayerIds.push(layer.id);
 		}
 	});
-	
-	const beforeBorders = borderLineLayerIds.length ? borderLineLayerIds[0] : undefined;
-	
+
+	if (borderLineLayerIds.length) setVisibility(borderLineLayerIds, "none");
+
+	const beforeLabels = baseLabelLayerIds.length ? baseLabelLayerIds[0] : undefined;
+
 	map.addLayer({ id:AVAIL_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-color": availabilityPaintExpr(_availableIsoList), "fill-opacity":0.85 },
+		paint:{
+			"fill-color": availabilityPaintExpr(),
+			"fill-opacity":0.95,
+			"fill-outline-color": BORDER_COLOR
+		},
 		layout:{ visibility:"visible" },
-		filter:["!=",["get","iso_a2"],"AQ"]
-	}, beforeBorders);
-	
+		filter: COUNTRY_BASE_FILTER
+	}, beforeLabels);
+
 	map.addLayer({ id:FADE_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-color":"#ffffff", "fill-opacity":0.5 },
+		paint:{
+			"fill-color": BLUSH_COLOR,
+			"fill-opacity":0.85,
+			"fill-outline-color": BORDER_COLOR
+		},
 		layout:{ visibility:"none" },
-		filter:["!=",["get","iso_a2"],"AQ"] });
-	
+		filter: COUNTRY_BASE_FILTER
+	});
+
 	map.addLayer({ id:HIGHLIGHT_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-color":HIGHLIGHT_COLOR, "fill-opacity":0.95 },
+		paint:{
+			"fill-color":HIGHLIGHT_COLOR,
+			"fill-opacity":0.95,
+			"fill-outline-color": BORDER_COLOR
+		},
 		layout:{ visibility:"none" },
-		filter:["==",["get","iso_a2"],"__none__"] });
-	
+		filter:["==",["get","iso_a2"],"__none__"]
+	});
+
+	if (!map.getSource(LABEL_SOURCE_ID)){
+		map.addSource(LABEL_SOURCE_ID, { type:"geojson", data: EMPTY_LABEL_FC });
+	}
 	map.addLayer({ id:LABEL_LAYER_ID, type:"symbol",
-		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		layout:{ visibility:"none", "text-field":["get","name_en"], "text-size":14, "text-justify":"center",
-			"text-anchor":"center", "text-allow-overlap":true, "text-font":["Open Sans Semibold","Arial Unicode MS Bold"] },
-		paint:{ "text-color":"#111", "text-halo-color":"rgba(255,255,255,0.8)", "text-halo-width":1 },
-		filter:["==",["get","iso_a2"],"__none__"] });
-	
+		source: LABEL_SOURCE_ID,
+		layout:{
+			visibility:"none",
+			"text-field":["get","name"],
+			"text-size":14,
+			"text-justify":"center",
+			"text-anchor":"center",
+			"text-font":["Open Sans Semibold","Arial Unicode MS Bold"],
+			"text-allow-overlap": false,
+			"text-padding": 2
+		},
+		paint:{ "text-color":"#111", "text-halo-color":"rgba(255,255,255,0.8)", "text-halo-width":1 }
+	});
+
 	map.addLayer({ id:HITBOX_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-opacity":0 }, filter:["!=",["get","iso_a2"],"AQ"] });
-	
+		paint:{ "fill-opacity":0 },
+		filter: COUNTRY_BASE_FILTER
+	});
+
 	let recentTouch=false;
 	map.on("click",(e)=>{ if(recentTouch){ recentTouch=false; return; } handlePickAtPoint(e.point); });
 	let touchStartPoint=null, touchMoved=false;
 	map.on("touchstart",(e)=>{ if(e.points && e.points.length===1){ touchStartPoint=e.point; touchMoved=false; } else touchStartPoint=null; });
 	map.on("touchmove",(e)=>{ if(!touchStartPoint) return; const dx=e.point.x-touchStartPoint.x, dy=e.point.y-touchStartPoint.y; if((dx*dx+dy*dy)>(10*10)) touchMoved=true; });
 	map.on("touchend",()=>{ if(!touchStartPoint||touchMoved){ touchStartPoint=null; return; } handlePickAtPoint(touchStartPoint); touchStartPoint=null; recentTouch=true; setTimeout(()=>recentTouch=false,250); });
-	
+
 	applyLabelModeForZoom();
 	map.on("zoom", applyLabelModeForZoom);
 	window.addEventListener("resize", ()=>requestAnimationFrame(placeInfoChip));
 	window.addEventListener("orientationchange", ()=>setTimeout(placeInfoChip,0));
-	
+
 	(async function prewarmBooksCache(){
 		try {
 			const db = await ensureFirestore(); if (!db) return;
@@ -696,8 +914,6 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		}
 	})();
 });
-
-// ─────────── Section Header ───────────
 
 // ─────────── Section Header ───────────
 const chatThread = document.getElementById("atlas-chat-thread");
@@ -990,18 +1206,12 @@ async function ensureBooksByIdMap(){
 }
 
 function primaryIsoForBook(book){
-	const pickToken = (arr) => {
-		if (!Array.isArray(arr)) return null;
-		for (const item of arr){
-			if (typeof item === "string" && item.length === 2) return item.toUpperCase();
-		}
-		return null;
-	};
-	return pickToken(book?.overrideTokens) ||
-		pickToken(book?.settingTokens) ||
-		pickToken(book?.authorCountryTokens) ||
-		pickToken(book?.authorOriginTokens) ||
-		null;
+	const arr = book?.overrideTokens;
+	if (!Array.isArray(arr)) return null;
+	for (const item of arr){
+		if (typeof item === "string" && item.length === 2) return item.toUpperCase();
+	}
+	return null;
 }
 
 function featureForIso(iso){
@@ -1013,7 +1223,9 @@ function featureForIso(iso){
 			const feats = map.querySourceFeatures(SOURCE_ID, { sourceLayer: SOURCE_LAYER }) || [];
 			for (const f of feats){
 				const v = String(f?.properties?.iso_a2 || "").toUpperCase();
-				if (v === clean) return f;
+				const rawLevel = f?.properties?.level;
+				const lvl = (typeof rawLevel === "number") ? rawLevel : Number(rawLevel);
+				if (v === clean && lvl === COUNTRY_LEVEL) return f;
 			}
 		}
 	} catch {}
@@ -1022,7 +1234,9 @@ function featureForIso(iso){
 		const feats2 = map.queryRenderedFeatures(undefined, { layers: [HITBOX_LAYER_ID] }) || [];
 		for (const f of feats2){
 			const v = String(f?.properties?.iso_a2 || "").toUpperCase();
-			if (v === clean) return f;
+			const rawLevel = f?.properties?.level;
+			const lvl = (typeof rawLevel === "number") ? rawLevel : Number(rawLevel);
+			if (v === clean && lvl === COUNTRY_LEVEL) return f;
 		}
 	} catch {}
 
