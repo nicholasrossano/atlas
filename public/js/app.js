@@ -87,7 +87,7 @@ window.addEventListener("pageshow", hardResize);
 document.addEventListener("visibilitychange", () => requestAnimationFrame(hardResize));
 
 // ─────────── Section Header ───────────
-const FADE_LAYER_ID="oly-fade", AVAIL_LAYER_ID="oly-avail", BOOKLESS_LAYER_ID="oly-bookless", HIGHLIGHT_LAYER_ID="oly-hi", LABEL_LAYER_ID="oly-label", HITBOX_LAYER_ID="oly-hit";
+const FADE_LAYER_ID="oly-fade", AVAIL_LAYER_ID="oly-avail", HIGHLIGHT_LAYER_ID="oly-hi", LABEL_LAYER_ID="oly-label", HITBOX_LAYER_ID="oly-hit";
 let selectedIso = null;
 let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[];
 
@@ -247,36 +247,26 @@ async function loadAllBooks(db){
 function computeAvailableIsoList(records){
 	const out = new Set();
 	for (const rec of records){
-		if (rec.overrideTokens && rec.overrideTokens.length){
-			for (const t of rec.overrideTokens) if (t && t.length === 2) out.add(t);
-			continue;
-		}
-		if (rec.settingTokens && rec.settingTokens.length){
-			for (const t of rec.settingTokens) if (t && t.length === 2) out.add(t);
-			continue;
-		}
-		for (const t of (rec.authorCountryTokens || [])) if (t && t.length === 2) out.add(t);
-		for (const t of (rec.authorOriginTokens || []))  if (t && t.length === 2) out.add(t);
+		if (!rec.overrideTokens || !rec.overrideTokens.length) continue;
+		for (const t of rec.overrideTokens) if (t && t.length === 2) out.add(t);
 	}
 	const arr = Array.from(out).filter(iso => iso !== "AQ").sort();
 	return arr;
 }
 
-function availabilityInFilter(list){
-	return ["in", ["get","iso_a2"], ["literal", list]];
-}
-
-function availabilityOutFilter(list){
-	return ["!", availabilityInFilter(list)];
+function availabilityPaintExpr(list){
+	return [
+		"case",
+		["==", ["get","iso_a2"], "AQ"], "rgba(0,0,0,0)",
+		["in", ["get","iso_a2"], ["literal", list]], HIGHLIGHT_COLOR,
+		BOOKLESS_COLOR
+	];
 }
 
 function updateAvailabilityStyle(){
-	if (!map.getLayer(AVAIL_LAYER_ID) || !map.getLayer(BOOKLESS_LAYER_ID)) return;
-	const availableFilter = ["all", ["!=", ["get","iso_a2"], "AQ"], availabilityInFilter(_availableIsoList)];
-	const booklessFilter = ["all", ["!=", ["get","iso_a2"], "AQ"], availabilityOutFilter(_availableIsoList)];
+	if (!map.getLayer(AVAIL_LAYER_ID)) return;
 	try {
-		map.setFilter(AVAIL_LAYER_ID, availableFilter);
-		map.setFilter(BOOKLESS_LAYER_ID, booklessFilter);
+		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr(_availableIsoList));
 	} catch(_) {}
 }
 
@@ -582,7 +572,6 @@ const resetSelection=()=>{ selectedIso=null; const none=["==",["get","iso_a2"],"
 	[HIGHLIGHT_LAYER_ID, LABEL_LAYER_ID].forEach(id=>{ if(map.getLayer(id)){ map.setFilter(id,none); map.setLayoutProperty(id,"visibility","none"); }});
 	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID,["!=",["get","iso_a2"],"AQ"]); }
 	if(map.getLayer(AVAIL_LAYER_ID)){ map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","visible"); }
-	if(map.getLayer(BOOKLESS_LAYER_ID)){ map.setLayoutProperty(BOOKLESS_LAYER_ID,"visibility","visible"); }
 	setVisibility(borderLineLayerIds,"visible"); setVisibility(baseLabelLayerIds,"visible");
 	applyLabelModeForZoom(); hideInfo(); };
 
@@ -603,7 +592,6 @@ function selectIso(iso, name, options){
 	map.setLayoutProperty(LABEL_LAYER_ID,"visibility","visible");
 	map.setLayoutProperty(FADE_LAYER_ID,"visibility","visible");
 	if(map.getLayer(AVAIL_LAYER_ID)) map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","none");
-	if(map.getLayer(BOOKLESS_LAYER_ID)) map.setLayoutProperty(BOOKLESS_LAYER_ID,"visibility","none");
 	setVisibility(baseLabelLayerIds,"none");
 	setVisibility(borderLineLayerIds,"none");
 	clearSuggestions();
@@ -646,18 +634,11 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 	
 	const beforeBorders = borderLineLayerIds.length ? borderLineLayerIds[0] : undefined;
 	
-	map.addLayer({ id:BOOKLESS_LAYER_ID, type:"fill",
-		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-color": BOOKLESS_COLOR, "fill-opacity":0.85 },
-		layout:{ visibility:"visible" },
-		filter:["all", ["!=",["get","iso_a2"],"AQ"], availabilityOutFilter(_availableIsoList)]
-	}, beforeBorders);
-	
 	map.addLayer({ id:AVAIL_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-color": HIGHLIGHT_COLOR, "fill-opacity":0.85 },
+		paint:{ "fill-color": availabilityPaintExpr(_availableIsoList), "fill-opacity":0.85 },
 		layout:{ visibility:"visible" },
-		filter:["all", ["!=",["get","iso_a2"],"AQ"], availabilityInFilter(_availableIsoList)]
+		filter:["!=",["get","iso_a2"],"AQ"]
 	}, beforeBorders);
 	
 	map.addLayer({ id:FADE_LAYER_ID, type:"fill",
