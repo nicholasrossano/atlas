@@ -27,10 +27,20 @@ const SOURCE_ID    = "countries";
 const SOURCE_LAYER = "administrative";
 const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
-const MIN_ZOOM = 1, MAX_ZOOM = 1.8, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
+const MIN_ZOOM = 1, MAX_ZOOM = 6, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
 const MIN_LAT = -60, MAX_LAT = 85;
 const ZOOM_LABEL_SWITCH = 2.0;
 const show = (msg, ...rest) => console.log(`[map] ${msg}`, ...rest);
+const COUNTRY_LEVEL_FILTER = ["all",
+	["!=", ["get","iso_a2"], "AQ"],
+	["any",
+		["==", ["get","admin_level"], 2],
+		["==", ["get","adm_level"], 2],
+		["==", ["get","level"], 2],
+		["==", ["length", ["coalesce", ["get","iso_a2"], ""]], 2]
+	]
+];
+const COUNTRY_NONE_FILTER = ["all", COUNTRY_LEVEL_FILTER, ["==", ["get","iso_a2"], "__none__"]];
 
 if (!MAPTILER_KEY || !STYLE_ID) {
 	console.warn("[atlas] Missing MapTiler config: set window.ATLAS_CONFIG.maptiler in /config.js");
@@ -576,9 +586,9 @@ function centerOnBounds(bbox) {
 }
 
 // ─────────── Section Header ───────────
-const resetSelection=()=>{ selectedIso=null; const none=["==",["get","iso_a2"],"__none__"];
-	[HIGHLIGHT_LAYER_ID, LABEL_LAYER_ID].forEach(id=>{ if(map.getLayer(id)){ map.setFilter(id,none); map.setLayoutProperty(id,"visibility","none"); }});
-	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID,["!=",["get","iso_a2"],"AQ"]); }
+const resetSelection=()=>{ selectedIso=null;
+	[HIGHLIGHT_LAYER_ID, LABEL_LAYER_ID].forEach(id=>{ if(map.getLayer(id)){ map.setFilter(id,COUNTRY_NONE_FILTER); map.setLayoutProperty(id,"visibility","none"); }});
+	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID,COUNTRY_LEVEL_FILTER); }
 	if(map.getLayer(AVAIL_LAYER_ID)){ map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","visible"); }
 	setVisibility(borderLineLayerIds,"visible"); setVisibility(baseLabelLayerIds,"visible");
 	applyLabelModeForZoom(); hideInfo(); };
@@ -591,8 +601,8 @@ function selectIso(iso, name, options){
 	if(!iso||iso==="AQ"){ resetSelection(); return; }
 	if(allowToggle && iso===selectedIso){ resetSelection(); return; }
 	selectedIso=iso;
-	const highlightFilter=["==",["get","iso_a2"],iso];
-	const fadeFilter=["all",["!=",["get","iso_a2"],iso],["!=",["get","iso_a2"],"AQ"]];
+	const highlightFilter=["all",COUNTRY_LEVEL_FILTER,["==",["get","iso_a2"],iso]];
+	const fadeFilter=["all",COUNTRY_LEVEL_FILTER,["!=",["get","iso_a2"],iso]];
 	map.setFilter(HIGHLIGHT_LAYER_ID,highlightFilter);
 	map.setFilter(LABEL_LAYER_ID,highlightFilter);
 	map.setFilter(FADE_LAYER_ID,fadeFilter);
@@ -646,31 +656,31 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{ "fill-color": availabilityPaintExpr(_availableIsoList), "fill-opacity":0.85 },
 		layout:{ visibility:"visible" },
-		filter:["!=",["get","iso_a2"],"AQ"]
+		filter:COUNTRY_LEVEL_FILTER
 	}, beforeBorders);
 	
 	map.addLayer({ id:FADE_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{ "fill-color":"#ffffff", "fill-opacity":0.5 },
 		layout:{ visibility:"none" },
-		filter:["!=",["get","iso_a2"],"AQ"] });
+		filter:COUNTRY_LEVEL_FILTER });
 	
 	map.addLayer({ id:HIGHLIGHT_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{ "fill-color":HIGHLIGHT_COLOR, "fill-opacity":0.95 },
 		layout:{ visibility:"none" },
-		filter:["==",["get","iso_a2"],"__none__"] });
+		filter:COUNTRY_NONE_FILTER });
 	
 	map.addLayer({ id:LABEL_LAYER_ID, type:"symbol",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		layout:{ visibility:"none", "text-field":["get","name_en"], "text-size":14, "text-justify":"center",
 			"text-anchor":"center", "text-allow-overlap":true, "text-font":["Open Sans Semibold","Arial Unicode MS Bold"] },
 		paint:{ "text-color":"#111", "text-halo-color":"rgba(255,255,255,0.8)", "text-halo-width":1 },
-		filter:["==",["get","iso_a2"],"__none__"] });
+		filter:COUNTRY_NONE_FILTER });
 	
 	map.addLayer({ id:HITBOX_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
-		paint:{ "fill-opacity":0 }, filter:["!=",["get","iso_a2"],"AQ"] });
+		paint:{ "fill-opacity":0 }, filter:COUNTRY_LEVEL_FILTER });
 	
 	let recentTouch=false;
 	map.on("click",(e)=>{ if(recentTouch){ recentTouch=false; return; } handlePickAtPoint(e.point); });
