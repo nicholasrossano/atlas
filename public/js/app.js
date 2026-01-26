@@ -34,10 +34,10 @@ const show = (msg, ...rest) => console.log(`[map] ${msg}`, ...rest);
 const COUNTRY_LEVEL_FILTER = ["all",
 	["!=", ["get","iso_a2"], "AQ"],
 	["any",
-		["==", ["get","admin_level"], 2],
-		["==", ["get","adm_level"], 2],
-		["==", ["get","level"], 2],
-		["==", ["length", ["coalesce", ["get","iso_a2"], ""]], 2]
+		["==", ["to-number", ["get","admin_level"]], 2],
+		["==", ["to-number", ["get","adm_level"]], 2],
+		["==", ["to-number", ["get","level"]], 2],
+		["all", ["has", "iso_a2"], ["!", ["has", "iso_3166_2"]]]
 	]
 ];
 const COUNTRY_NONE_FILTER = ["all", COUNTRY_LEVEL_FILTER, ["==", ["get","iso_a2"], "__none__"]];
@@ -97,9 +97,9 @@ window.addEventListener("pageshow", hardResize);
 document.addEventListener("visibilitychange", () => requestAnimationFrame(hardResize));
 
 // ─────────── Section Header ───────────
-const FADE_LAYER_ID="oly-fade", AVAIL_LAYER_ID="oly-avail", HIGHLIGHT_LAYER_ID="oly-hi", LABEL_LAYER_ID="oly-label", HITBOX_LAYER_ID="oly-hit";
+const FADE_LAYER_ID="oly-fade", AVAIL_LAYER_ID="oly-avail", HIGHLIGHT_LAYER_ID="oly-hi", LABEL_LAYER_ID="oly-label", HITBOX_LAYER_ID="oly-hit", BORDER_LAYER_ID="oly-border";
 let selectedIso = null;
-let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[];
+let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[], nonCountryLabelLayerIds=[];
 
 // ─────────── Section Header ───────────
 const infoBox   = document.getElementById("atlas-info");
@@ -536,6 +536,7 @@ const applyLabelModeForZoom=()=>{ if(selectedIso) return;
 	const showContinents = map.getZoom() < ZOOM_LABEL_SWITCH;
 	if (continentLabelLayerIds.length) setVisibility(continentLabelLayerIds, showContinents ? "visible":"none");
 	if (countryLabelLayerIds.length)   setVisibility(countryLabelLayerIds,   showContinents ? "none":"visible");
+	if (nonCountryLabelLayerIds.length) setVisibility(nonCountryLabelLayerIds, "none");
 };
 
 // ─────────── Section Header ───────────
@@ -590,7 +591,7 @@ const resetSelection=()=>{ selectedIso=null;
 	[HIGHLIGHT_LAYER_ID, LABEL_LAYER_ID].forEach(id=>{ if(map.getLayer(id)){ map.setFilter(id,COUNTRY_NONE_FILTER); map.setLayoutProperty(id,"visibility","none"); }});
 	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID,COUNTRY_LEVEL_FILTER); }
 	if(map.getLayer(AVAIL_LAYER_ID)){ map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","visible"); }
-	setVisibility(borderLineLayerIds,"visible"); setVisibility(baseLabelLayerIds,"visible");
+	setVisibility(borderLineLayerIds,"none"); setVisibility(nonCountryLabelLayerIds,"none");
 	applyLabelModeForZoom(); hideInfo(); };
 
 function selectIso(iso, name, options){
@@ -649,12 +650,20 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 			borderLineLayerIds.push(layer.id);
 		}
 	});
+	nonCountryLabelLayerIds = baseLabelLayerIds.filter(id => !continentLabelLayerIds.includes(id) && !countryLabelLayerIds.includes(id));
 	
 	const beforeBorders = borderLineLayerIds.length ? borderLineLayerIds[0] : undefined;
 	
 	map.addLayer({ id:AVAIL_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{ "fill-color": availabilityPaintExpr(_availableIsoList), "fill-opacity":0.85 },
+		layout:{ visibility:"visible" },
+		filter:COUNTRY_LEVEL_FILTER
+	}, beforeBorders);
+	
+	map.addLayer({ id:BORDER_LAYER_ID, type:"line",
+		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
+		paint:{ "line-color":"#ffffff", "line-width":1, "line-opacity":0.7 },
 		layout:{ visibility:"visible" },
 		filter:COUNTRY_LEVEL_FILTER
 	}, beforeBorders);
@@ -681,6 +690,9 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 	map.addLayer({ id:HITBOX_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{ "fill-opacity":0 }, filter:COUNTRY_LEVEL_FILTER });
+	
+	setVisibility(borderLineLayerIds,"none");
+	setVisibility(nonCountryLabelLayerIds,"none");
 	
 	let recentTouch=false;
 	map.on("click",(e)=>{ if(recentTouch){ recentTouch=false; return; } handlePickAtPoint(e.point); });
