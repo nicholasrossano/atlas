@@ -194,6 +194,24 @@ function normalizeCountryToken(value){
 	return trimmed.toUpperCase();
 }
 
+function normalizeCountryIso(value){
+	if (typeof value !== "string") return null;
+	const trimmed = value.trim().toUpperCase();
+	if (!trimmed) return null;
+	if (trimmed.includes("-")) return trimmed.split("-")[0];
+	if (trimmed.length === 2) return trimmed;
+	return null;
+}
+
+function countryIsoFromFeature(feature){
+	const props = feature?.properties || {};
+	const rawIso = props.iso_a2 || props.ISO_A2 || props.iso || props.ISO || "";
+	const direct = normalizeCountryIso(String(rawIso || ""));
+	if (direct) return direct;
+	const sub = props.iso_3166_2 || props.ISO_3166_2 || "";
+	return normalizeCountryIso(String(sub || ""));
+}
+
 function normalizeTokenList(field){
 	const tokens = [];
 	const seen = new Set();
@@ -505,7 +523,7 @@ function placeInfoChip(){
 }
 function showInfo(iso,name){
 	infoFlag.textContent = isoToFlagEmoji(iso);
-	infoName.textContent = name || iso || "—";
+	infoName.textContent = iso || "—";
 	if (infoBox) infoBox.classList.remove("is-book-detail");
 	
 	if (isMobile()) clearSuggestions();
@@ -599,11 +617,12 @@ function selectIso(iso, name, options){
 	const opts = (options && typeof options === "object") ? options : {};
 	const shouldShowInfo = !(opts.showInfo === false);
 	const allowToggle = (opts.allowToggle !== false);
-	if(!iso||iso==="AQ"){ resetSelection(); return; }
-	if(allowToggle && iso===selectedIso){ resetSelection(); return; }
-	selectedIso=iso;
-	const highlightFilter=["all",COUNTRY_LEVEL_FILTER,["==",["get","iso_a2"],iso]];
-	const fadeFilter=["all",COUNTRY_LEVEL_FILTER,["!=",["get","iso_a2"],iso]];
+	const normalizedIso = normalizeCountryIso(String(iso || ""));
+	if(!normalizedIso||normalizedIso==="AQ"){ resetSelection(); return; }
+	if(allowToggle && normalizedIso===selectedIso){ resetSelection(); return; }
+	selectedIso=normalizedIso;
+	const highlightFilter=["all",COUNTRY_LEVEL_FILTER,["==",["get","iso_a2"],normalizedIso]];
+	const fadeFilter=["all",COUNTRY_LEVEL_FILTER,["!=",["get","iso_a2"],normalizedIso]];
 	map.setFilter(HIGHLIGHT_LAYER_ID,highlightFilter);
 	map.setFilter(LABEL_LAYER_ID,highlightFilter);
 	map.setFilter(FADE_LAYER_ID,fadeFilter);
@@ -614,7 +633,7 @@ function selectIso(iso, name, options){
 	setVisibility(baseLabelLayerIds,"none");
 	setVisibility(borderLineLayerIds,"none");
 	clearSuggestions();
-	if (shouldShowInfo) showInfo(iso,name);
+	if (shouldShowInfo) showInfo(normalizedIso,name);
 }
 
 function handlePickAtPoint(point){
@@ -622,10 +641,9 @@ function handlePickAtPoint(point){
 	const hit=map.queryRenderedFeatures(box,{layers:[HITBOX_LAYER_ID]});
 	if(hit.length){
 		const f   = hit[0];
-		const iso = f?.properties?.iso_a2;
-		const propName = f?.properties?.name_en ?? f?.properties?.NAME ?? f?.properties?.ADMIN ?? f?.properties?.name;
-		const nice = fullCountryName(iso, propName);
-		selectIso(iso, nice);
+		const iso = countryIsoFromFeature(f);
+		if (!iso) { resetSelection(); return; }
+		selectIso(iso, iso);
 		centerOnFeature(f);
 		requestAnimationFrame(placeInfoChip);
 	} else {
@@ -1078,7 +1096,7 @@ async function openBookFromChat(bookId){
 	const book = byId.get(bookId);
 	if (!book) return;
 
-	const iso = primaryIsoForBook(book);
+	const iso = normalizeCountryIso(primaryIsoForBook(book) || "");
 	const niceName = iso ? fullCountryName(iso, "") : "Book";
 
 	if (iso){
@@ -1093,7 +1111,7 @@ async function openBookFromChat(bookId){
 	}
 
 	infoFlag.textContent = isoToFlagEmoji(iso);
-	infoName.textContent = niceName;
+	infoName.textContent = iso || "—";
 	infoBox.classList.add("is-visible");
 	showBookDetail(book, iso);
 	requestAnimationFrame(placeInfoChip);
