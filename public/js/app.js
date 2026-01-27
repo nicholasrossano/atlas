@@ -38,7 +38,12 @@ const MIN_LAT = -60, MAX_LAT = 85;
 const ZOOM_LABEL_SWITCH = 2.0;
 
 const SELECT_ZOOM = 2.5;
-const SELECT_DURATION_MS = 650;
+const SELECT_DURATION_MS = 900;
+const SELECTION_FADE_MS = 260;
+const AVAIL_OPACITY = 0.95;
+const FADE_OPACITY = 0.85;
+const HIGHLIGHT_OPACITY = 0.95;
+const layerFadeTransition = () => ({ duration: SELECTION_FADE_MS, delay: 0 });
 
 const show = (msg, ...rest) => console.log(`[map] ${msg}`, ...rest);
 
@@ -104,6 +109,8 @@ const COUNTRY_LEVEL = 0;
 const COUNTRY_BASE_FILTER = ["all", ["==", ["get","level"], COUNTRY_LEVEL], ["!=", ["get","iso_a2"], "AQ"]];
 
 let selectedIso = null;
+let availHideTimer = null;
+let selectionHideTimer = null;
 let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], countryLabelLayerIds=[], otherLabelLayerIds=[];
 
 // ─────────── Section Header ───────────
@@ -527,6 +534,16 @@ function hideInfo(){
 
 // ─────────── Section Header ───────────
 const setVisibility=(ids,vis)=>ids.forEach(id=>{ if(map.getLayer(id)) map.setLayoutProperty(id,"visibility",vis); });
+const setLayerOpacity = (id, opacity) => {
+	try { if (map.getLayer(id)) map.setPaintProperty(id, "fill-opacity", opacity); } catch(_) {}
+};
+const setLayerVisibility = (id, visibility) => {
+	try { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visibility); } catch(_) {}
+};
+const clearTimer = (timerId) => {
+	if (timerId) clearTimeout(timerId);
+	return null;
+};
 const applyLabelModeForZoom=()=>{ if(selectedIso) return;
 	const showContinents = map.getZoom() < ZOOM_LABEL_SWITCH;
 
@@ -567,8 +584,8 @@ function centerOnFeature(feature) {
 	map.fitBounds(clamped, {
 		padding: { top: 90, right: 90, bottom: 100, left: 90 },
 		maxZoom: Math.min(4.5, MAX_ZOOM),
-		duration: 650,
-		linear: true
+		duration: SELECT_DURATION_MS,
+		linear: false
 	});
 }
 function centerOnBounds(bbox) {
@@ -578,8 +595,8 @@ function centerOnBounds(bbox) {
 	map.fitBounds(clamped, {
 		padding: { top: 90, right: 90, bottom: 100, left: 90 },
 		maxZoom: Math.min(4.5, MAX_ZOOM),
-		duration: 650,
-		linear: true
+		duration: SELECT_DURATION_MS,
+		linear: false
 	});
 }
 
@@ -729,10 +746,27 @@ function updateSelectedLabelAndPoint(iso, name, fallbackFeature){
 
 // ─────────── Section Header ───────────
 const resetSelection=()=>{ selectedIso=null; const none=["==",["get","iso_a2"],"__none__"];
-	if(map.getLayer(HIGHLIGHT_LAYER_ID)){ map.setFilter(HIGHLIGHT_LAYER_ID,none); map.setLayoutProperty(HIGHLIGHT_LAYER_ID,"visibility","none"); }
-	if(map.getLayer(FADE_LAYER_ID)){ map.setLayoutProperty(FADE_LAYER_ID,"visibility","none"); map.setFilter(FADE_LAYER_ID, COUNTRY_BASE_FILTER); }
+	availHideTimer = clearTimer(availHideTimer);
+	selectionHideTimer = clearTimer(selectionHideTimer);
+	if(map.getLayer(HIGHLIGHT_LAYER_ID)){
+		map.setFilter(HIGHLIGHT_LAYER_ID,none);
+		setLayerOpacity(HIGHLIGHT_LAYER_ID, 0);
+	}
+	if(map.getLayer(FADE_LAYER_ID)){
+		map.setFilter(FADE_LAYER_ID, COUNTRY_BASE_FILTER);
+		setLayerOpacity(FADE_LAYER_ID, 0);
+	}
+	selectionHideTimer = setTimeout(() => {
+		setLayerVisibility(HIGHLIGHT_LAYER_ID, "none");
+		setLayerVisibility(FADE_LAYER_ID, "none");
+		selectionHideTimer = null;
+	}, SELECTION_FADE_MS);
 	clearSelectedLabel();
-	if(map.getLayer(AVAIL_LAYER_ID)){ map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","visible"); }
+	if(map.getLayer(AVAIL_LAYER_ID)){
+		setLayerVisibility(AVAIL_LAYER_ID, "visible");
+		setLayerOpacity(AVAIL_LAYER_ID, 0);
+		requestAnimationFrame(() => setLayerOpacity(AVAIL_LAYER_ID, AVAIL_OPACITY));
+	}
 	setVisibility(baseLabelLayerIds,"visible");
 	applyLabelModeForZoom();
 	hideInfo();
@@ -763,10 +797,24 @@ function selectIso(iso, name, options){
 	map.setFilter(HIGHLIGHT_LAYER_ID,highlightFilter);
 	map.setFilter(FADE_LAYER_ID,fadeFilter);
 
-	map.setLayoutProperty(HIGHLIGHT_LAYER_ID,"visibility","visible");
-	map.setLayoutProperty(FADE_LAYER_ID,"visibility","visible");
+	availHideTimer = clearTimer(availHideTimer);
+	selectionHideTimer = clearTimer(selectionHideTimer);
+	setLayerVisibility(HIGHLIGHT_LAYER_ID, "visible");
+	setLayerVisibility(FADE_LAYER_ID, "visible");
+	setLayerOpacity(HIGHLIGHT_LAYER_ID, 0);
+	setLayerOpacity(FADE_LAYER_ID, 0);
+	requestAnimationFrame(() => {
+		setLayerOpacity(HIGHLIGHT_LAYER_ID, HIGHLIGHT_OPACITY);
+		setLayerOpacity(FADE_LAYER_ID, FADE_OPACITY);
+	});
 
-	if(map.getLayer(AVAIL_LAYER_ID)) map.setLayoutProperty(AVAIL_LAYER_ID,"visibility","none");
+	if(map.getLayer(AVAIL_LAYER_ID)){
+		setLayerOpacity(AVAIL_LAYER_ID, 0);
+		availHideTimer = setTimeout(() => {
+			setLayerVisibility(AVAIL_LAYER_ID,"none");
+			availHideTimer = null;
+		}, SELECTION_FADE_MS);
+	}
 
 	setVisibility(baseLabelLayerIds,"none");
 	clearSuggestions();
@@ -837,8 +885,11 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{
 			"fill-color": availabilityPaintExpr(),
-			"fill-opacity":0.95,
-			"fill-outline-color": BORDER_COLOR
+			"fill-opacity": AVAIL_OPACITY,
+			"fill-outline-color": BORDER_COLOR,
+			"fill-color-transition": layerFadeTransition(),
+			"fill-opacity-transition": layerFadeTransition(),
+			"fill-outline-color-transition": layerFadeTransition()
 		},
 		layout:{ visibility:"visible" },
 		filter: COUNTRY_BASE_FILTER
@@ -848,8 +899,11 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{
 			"fill-color": BLUSH_COLOR,
-			"fill-opacity":0.85,
-			"fill-outline-color": BORDER_COLOR
+			"fill-opacity": FADE_OPACITY,
+			"fill-outline-color": BORDER_COLOR,
+			"fill-color-transition": layerFadeTransition(),
+			"fill-opacity-transition": layerFadeTransition(),
+			"fill-outline-color-transition": layerFadeTransition()
 		},
 		layout:{ visibility:"none" },
 		filter: COUNTRY_BASE_FILTER
@@ -859,8 +913,11 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{
 			"fill-color":HIGHLIGHT_COLOR,
-			"fill-opacity":0.95,
-			"fill-outline-color": BORDER_COLOR
+			"fill-opacity": HIGHLIGHT_OPACITY,
+			"fill-outline-color": BORDER_COLOR,
+			"fill-color-transition": layerFadeTransition(),
+			"fill-opacity-transition": layerFadeTransition(),
+			"fill-outline-color-transition": layerFadeTransition()
 		},
 		layout:{ visibility:"none" },
 		filter:["==",["get","iso_a2"],"__none__"]
