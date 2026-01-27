@@ -228,6 +228,21 @@ function normalizeTokenList(field){
 	return tokens;
 }
 
+function normalizeTagList(field){
+	const out = [];
+	if (Array.isArray(field)) {
+		for (const val of field){
+			if (typeof val !== "string") continue;
+			const trimmed = val.trim();
+			if (trimmed) out.push(trimmed);
+		}
+	} else if (typeof field === "string") {
+		const trimmed = field.trim();
+		if (trimmed) out.push(trimmed);
+	}
+	return out;
+}
+
 function hasTokenMatch(tokens, candidates){
 	if (!tokens.length || !candidates.length) return false;
 	const pool = new Set(tokens);
@@ -256,6 +271,8 @@ async function loadAllBooks(db){
 					cover_url: data.cover_url || "",
 					summary,
 					bookshop_url: bookshopUrl,
+					tags: normalizeTagList(data.tags),
+					read: data.read === true,
 					overrideTokens: normalizeTokenList(data.country_override)
 				});
 			});
@@ -402,6 +419,9 @@ function showBookDetail(book, iso){
 	const hasSummary = summary.length > 0;
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
 	const hasBuy = rawBuyUrl.length > 0;
+	const isEditorRead = book.read === true;
+	const tagColors = ["#8D1717", "#711248", "#BD6217", "#0E5555", "#8285B6", "#127112", "#5F8415"];
+	const tags = Array.isArray(book.tags) ? book.tags : [];
 
 	let buyButtonHtml = "";
 	if (hasBuy){
@@ -417,6 +437,21 @@ function showBookDetail(book, iso){
   `;
 	}
 
+	let editorReadHtml = "";
+	if (isEditorRead){
+		editorReadHtml = `<div class="atlas-book-editor-read">Editor Read</div>`;
+	}
+
+	let tagsHtml = "";
+	if (tags.length){
+		const pills = tags.slice(0, tagColors.length).map((tag, idx) => {
+			const text = String(tag || "").trim();
+			if (!text) return "";
+			return `<span class="atlas-book-tag" style="--tag-color:${tagColors[idx]};">${escapeHtml(text)}</span>`;
+		}).filter(Boolean).join("");
+		if (pills) tagsHtml = `<div class="atlas-book-tags">${pills}</div>`;
+	}
+
 	const html = `
   <div class="atlas-book-detail">
   <div class="atlas-book-detail-header">
@@ -427,9 +462,10 @@ function showBookDetail(book, iso){
   <img class="atlas-book-detail-cover" src="${cover}" alt="${escapeHtml(safeAlt)}">
   <div class="atlas-book-detail-meta">
   <div class="atlas-book-detail-text">
-   <div class="atlas-book-editor-read">Editor Read</div>
+   ${editorReadHtml}
    <div class="atlas-book-detail-title">${escapeHtml(title)}</div>
    <div class="atlas-book-detail-author">${escapeHtml(author)}</div>
+   ${tagsHtml}
   </div>
   ${buyButtonHtml}
   </div>

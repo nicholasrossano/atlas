@@ -334,15 +334,14 @@ body.atlas-chat-expanded .atlas-info {
 	padding-right: 4px;
 	box-sizing: border-box;
 	height: 100%;
-	justify-content: space-between;
+	justify-content: center;
 }
 
 .atlas-book-detail-text {
 	display: flex;
 	flex-direction: column;
-	gap: 4px;
-	margin-top: auto;
-	margin-bottom: auto;
+	gap: 6px;
+	margin: 0;
 }
 
 .atlas-book-editor-read {
@@ -371,6 +370,25 @@ body.atlas-chat-expanded .atlas-info {
 	font: 600 12px/1.2 system-ui, -apple-system, "Avenir Next", Avenir, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
 	color: #333;
 	opacity: .9;
+}
+
+.atlas-book-tags {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-top: 0;
+}
+
+.atlas-book-tag {
+	padding: 4px 10px;
+	border-radius: 999px;
+	border: 1px solid var(--tag-color, #301900);
+	color: var(--tag-color, #301900);
+	background: transparent;
+	font: 600 10px/1.2 system-ui, -apple-system, "Avenir Next", Avenir, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+	letter-spacing: .01em;
+	text-transform: capitalize;
+	white-space: nowrap;
 }
 
 .atlas-book-buy {
