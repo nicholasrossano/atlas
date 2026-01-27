@@ -697,6 +697,81 @@ function labelPointFromLabelLayers(iso){
 	return null;
 }
 
+function labelTextFromProps(props){
+	const keys = ["name:en","name_en","name","NAME","ADMIN"];
+	for (const key of keys){
+		const val = props?.[key];
+		if (typeof val === "string" && val.trim()) return val.trim();
+	}
+	return "";
+}
+
+function evalTextField(expr, props){
+	if (expr == null) return "";
+	if (typeof expr === "string" || typeof expr === "number") return String(expr).trim();
+	if (!Array.isArray(expr) || !expr.length) return "";
+	const op = expr[0];
+	switch (op){
+		case "get": {
+			const key = expr[1];
+			if (typeof key !== "string") return "";
+			const val = props?.[key];
+			return (val == null) ? "" : String(val).trim();
+		}
+		case "coalesce": {
+			for (let i = 1; i < expr.length; i++){
+				const val = evalTextField(expr[i], props);
+				if (val) return val;
+			}
+			return "";
+		}
+		case "concat": {
+			const joined = expr.slice(1).map(part => evalTextField(part, props)).join("");
+			return joined.trim();
+		}
+		case "to-string": {
+			const val = evalTextField(expr[1], props);
+			return val ? String(val).trim() : "";
+		}
+		case "format": {
+			let out = "";
+			for (let i = 1; i < expr.length; i += 2){
+				const part = evalTextField(expr[i], props);
+				if (part) out += part;
+			}
+			return out.trim();
+		}
+		default:
+			return "";
+	}
+}
+
+function labelTextFromLabelLayers(iso){
+	const labelLayerIds = countryLabelLayerIds.length ? countryLabelLayerIds : baseLabelLayerIds;
+	if (!labelLayerIds.length) return "";
+	for (const layerId of labelLayerIds){
+		const layer = map.getLayer(layerId);
+		if (!layer || !layer.source) continue;
+		const sourceLayer = layer["source-layer"];
+		let feats = [];
+		try {
+			feats = map.querySourceFeatures(layer.source, sourceLayer ? { sourceLayer } : {}) || [];
+		} catch(_) {
+			feats = [];
+		}
+		for (const feat of feats){
+			if (!matchesIsoProps(feat?.properties, iso)) continue;
+			const props = feat?.properties || {};
+			const textField = layer?.layout?.["text-field"];
+			const fromExpr = evalTextField(textField, props);
+			if (fromExpr) return fromExpr;
+			const fromProps = labelTextFromProps(props);
+			if (fromProps) return fromProps;
+		}
+	}
+	return "";
+}
+
 function baseLabelLayerForStyle(){
 	const ids = countryLabelLayerIds.length ? countryLabelLayerIds : baseLabelLayerIds;
 	for (const id of ids){
@@ -937,7 +1012,9 @@ function selectIso(iso, name, options){
 	syncSelectedLabelStyle();
 	clearSuggestions();
 
-	const labelText = String(name || "").trim() || fullCountryName(iso, "");
+	const infoName = String(name || "").trim() || fullCountryName(iso, "");
+	const baseLabel = labelTextFromLabelLayers(iso) || infoName;
+	const labelText = baseLabel ? baseLabel.toUpperCase() : infoName.toUpperCase();
 	const pt = updateSelectedLabelAndPoint(iso, labelText, pickedFeature);
 
 	if (pt) {
@@ -952,7 +1029,7 @@ function selectIso(iso, name, options){
 		setTimeout(() => { attempt(); }, 350);
 	}
 
-	if (shouldShowInfo) showInfo(iso,labelText);
+	if (shouldShowInfo) showInfo(iso, infoName);
 }
 
 function handlePickAtPoint(point){
