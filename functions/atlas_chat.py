@@ -274,23 +274,6 @@ def _load_atlas_books_cached() -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str
 	return items, by_id, available
 
 
-def _user_wants_single(user_text: str) -> bool:
-	q = _normalize_text(user_text)
-	if not q:
-		return False
-	if "top rec" in q or "top recommendation" in q:
-		return True
-	if "just one" in q or "only one" in q or "one book" in q:
-		return True
-	if "one recommendation" in q or "one rec" in q:
-		return True
-	if "single recommendation" in q or "single rec" in q:
-		return True
-	if q.startswith("give me a book") or q.startswith("recommend a book"):
-		return True
-	return False
-
-
 # ─────────── OpenAI plumbing ───────────
 def _call_openai(api_key: str, payload: Dict[str, Any]) -> Dict[str, Any]:
 	r = requests.post(
@@ -338,8 +321,6 @@ def _recommend_with_llm(
 	available_countries: List[Dict[str, str]],
 	candidates: List[Dict[str, Any]]
 ) -> Dict[str, Any]:
-	wants_single = _user_wants_single(user_text)
-
 	compact: List[Dict[str, Any]] = []
 	for b in candidates:
 		places = b.get("_places") or {}
@@ -362,16 +343,16 @@ def _recommend_with_llm(
 		"Your only hard constraint is: recommend ONLY books that exist in CANDIDATES.\n\n"
 		"Geography behavior:\n"
 		"- The user's prompt is authoritative.\n"
-		"- If the user mentions a country/continent/region (e.g., Africa, South America), you must satisfy that request.\n"
-		"- Use AVAILABLE_COUNTRIES as the set of ISO2 codes that exist in the catalog.\n"
-		"- Use your world knowledge to map continents/regions to ISO2 codes, then choose only ISO2 codes that are present in AVAILABLE_COUNTRIES.\n"
+		"- If the user mentions a specific country, ONLY return books tied to that country.\n"
+		"- If the user mentions a continent/region (e.g., Africa, South America, Southeast Asia), infer the countries in that region using general world knowledge, then return books from those countries only.\n"
+		"- Use AVAILABLE_COUNTRIES as the set of ISO2 codes that exist in the catalog; only choose ISO2 codes that are present there.\n"
 		"- Match the user's requested geography primarily using places.override (country_override). If override is missing, fall back to setting/author.\n"
 		"- selected_iso2 is a UI hint ONLY when the user did not specify a location.\n"
 		"- If you cannot find any matching book(s) in CANDIDATES for the user's geography constraint, return recommendations as an empty list and explain briefly in assistant_markdown.\n\n"
 		"Output requirements:\n"
 		"- assistant_markdown must be prose only (1–3 sentences). No headings, no bullet points, no numbered lists.\n"
 		"- Each mentioned book must be formatted as: **Title** by Author.\n"
-		f"- Return {'exactly 1' if wants_single else 'up to 3'} recommendation(s).\n"
+		"- If the user asks for a book, return exactly 1 recommendation. If they ask for recommendations, return up to 3.\n"
 		"- assistant_markdown must mention ALL recommended books (and only those books).\n"
 		"- Each recommendations[i].reason must be exactly 1 sentence grounded in metadata.\n"
 		"- follow_up_questions should usually be empty.\n"
@@ -513,8 +494,6 @@ def _build_synced_markdown(by_id: Dict[str, Dict[str, Any]], clean_recs: List[Di
 
 
 def _validate_payload(parsed: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], user_text: str) -> Dict[str, Any]:
-	wants_single = _user_wants_single(user_text)
-
 	assistant_markdown = _sanitize_assistant_markdown(parsed.get("assistant_markdown") if isinstance(parsed, dict) else "")
 	recs = parsed.get("recommendations") if isinstance(parsed, dict) and isinstance(parsed.get("recommendations"), list) else []
 	fups = parsed.get("follow_up_questions") if isinstance(parsed, dict) and isinstance(parsed.get("follow_up_questions"), list) else []
@@ -530,9 +509,7 @@ def _validate_payload(parsed: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], 
 			seen_ids.add(bid)
 			clean_recs.append({"book_id": bid, "reason": str(reason or "").strip()[:240]})
 
-	if wants_single and len(clean_recs) > 1:
-		clean_recs = clean_recs[:1]
-	if (not wants_single) and len(clean_recs) > 3:
+	if len(clean_recs) > 3:
 		clean_recs = clean_recs[:3]
 
 	clean_fups: List[str] = []
