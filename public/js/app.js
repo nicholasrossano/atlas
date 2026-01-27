@@ -427,6 +427,7 @@ function showBookDetail(book, iso){
   <img class="atlas-book-detail-cover" src="${cover}" alt="${escapeHtml(safeAlt)}">
   <div class="atlas-book-detail-meta">
   <div class="atlas-book-detail-text">
+   <div class="atlas-book-editor-read">Editor Read</div>
    <div class="atlas-book-detail-title">${escapeHtml(title)}</div>
    <div class="atlas-book-detail-author">${escapeHtml(author)}</div>
   </div>
