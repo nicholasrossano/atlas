@@ -8,9 +8,11 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 /* Map fills the viewport; gestures go to the map, not the page */
 #map {
 	position: fixed;
-	inset: 0;
-	width: 100%;
-	height: 100%;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	height: 100lvh;
 	cursor: grab;
 	touch-action: none;
 	overscroll-behavior: none;
