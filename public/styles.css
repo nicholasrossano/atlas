@@ -58,15 +58,22 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 .atlas-home:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
 .atlas-home-icon { width: 20px; height: 20px; display: block; }
 
-.atlas-head { display: flex; flex-direction: column; padding-left: 0; }
+.atlas-head {
+	display: flex;
+	flex-direction: column;
+	padding-left: 0;
+	min-width: 0;
+	max-width: 85vw;
+}
 
 .atlas-title {
 	margin: 0 0 2px;
 	font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", Times, serif;
-	font-size: clamp(18px, 2.4vw, 22px);
+	font-size: clamp(12px, 3.2vw, 22px);
 	font-weight: 700;
 	letter-spacing: 0.2px;
 	color: #111;
+	white-space: nowrap;
 }
 .atlas-subtitle {
 	margin: 0; opacity: .9; color: #333;
