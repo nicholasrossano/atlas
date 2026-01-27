@@ -1,6 +1,9 @@
 html, body { margin: 0; height: 100%; background: #faf7ef; }
 
-:root { --atlas-shadow: 0 14px 40px rgba(0,0,0,.28); }
+:root {
+	--atlas-shadow: 0 14px 40px rgba(0,0,0,.28);
+	--atlas-panel-w: min(560px, 92vw);
+}
 
 /* Map fills the viewport; gestures go to the map, not the page */
 #map {
@@ -18,7 +21,7 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 .atlas-header {
 	position: fixed;
 	top: calc(16px + env(safe-area-inset-top));
-	left: calc(16px + env(safe-area-inset-left));
+	left: 50%;
 	z-index: 1200;
 	background: rgba(255,255,255,0.62);
 	-webkit-backdrop-filter: blur(12px);
@@ -28,7 +31,7 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 	box-shadow: var(--atlas-shadow);
 	pointer-events: none;
 	user-select: none;
-	transform: translateZ(0);
+	transform: translate3d(-50%, 0, 0);
 	will-change: transform;
 	
 	display: flex;
@@ -82,14 +85,14 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 /* ─────────── Country chip (widget) ─────────── */
 .atlas-info {
 	position: fixed;
-	bottom: calc(16px + env(safe-area-inset-bottom));
-	left:  calc(16px + env(safe-area-inset-left));
+	bottom: calc(18px + env(safe-area-inset-bottom) + var(--atlas-search-h, 56px) + 12px);
+	left: 50%;
 	z-index: 1310;
 	display: flex;
 	flex-direction: column;
-	align-items: flex-start;
+	align-items: stretch;
 	gap: 8px;
-	max-width: min(420px, 80vw);
+	width: var(--atlas-panel-w);
 	background: rgba(255,255,255,0.62);
 	-webkit-backdrop-filter: blur(12px);
 	backdrop-filter: blur(12px);
@@ -98,15 +101,16 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 	box-shadow: var(--atlas-shadow);
 	pointer-events: none;
 	user-select: none;
+	box-sizing: border-box;
 	
-	opacity: 0; visibility: hidden; transform: translateY(10px);
+	opacity: 0; visibility: hidden; transform: translate3d(-50%, 10px, 0);
 	transition: transform 160ms ease-out, opacity 160ms ease-out, visibility 0s linear 160ms, bottom 160ms ease-out;
 }
 .atlas-info.stacked {
-	bottom: calc(16px + env(safe-area-inset-bottom) + var(--atlas-search-h, 56px) + 12px);
+	bottom: calc(18px + env(safe-area-inset-bottom) + var(--atlas-search-h, 56px) + 12px);
 }
 .atlas-info.is-visible {
-	opacity: 1; visibility: visible; transform: translateY(0);
+	opacity: 1; visibility: visible; transform: translate3d(-50%, 0, 0);
 	transition: transform 160ms ease-out, opacity 160ms ease-out, visibility 0s linear 0s, bottom 160ms ease-out;
 }
 
@@ -115,7 +119,7 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 body.atlas-chat-expanded .atlas-info {
 	opacity: 0 !important;
 	visibility: hidden !important;
-	transform: translateY(10px) !important;
+	transform: translate3d(-50%, 10px, 0) !important;
 	pointer-events: none !important;
 	transition: transform 160ms ease-out, opacity 160ms ease-out, visibility 0s linear 160ms;
 }
@@ -200,7 +204,7 @@ body.atlas-chat-expanded .atlas-info {
 	bottom: calc(18px + env(safe-area-inset-bottom));
 	transform: translateX(-50%);
 	z-index: 1300;
-	width: min(560px, 92vw);
+	width: var(--atlas-panel-w);
 	pointer-events: none;
 }
 
@@ -227,7 +231,7 @@ body.atlas-chat-expanded .atlas-info {
 	pointer-events: auto;
 	position: absolute; left: 50%; transform: translateX(-50%);
 	bottom: calc(52px + 6px);
-	width: min(560px, 92vw);
+	width: var(--atlas-panel-w);
 	margin: 0; padding: 6px;
 	list-style: none;
 	background: rgba(255,255,255,0.92);
@@ -253,7 +257,7 @@ body.atlas-chat-expanded .atlas-info {
 
 /* Mobile small tweaks */
 @media (max-width: 520px) {
-	.atlas-header { left: calc(12px + env(safe-area-inset-left)); padding: 10px 12px; }
+	.atlas-header { left: 50%; padding: 10px 12px; }
 }
 
 /* ─────────── Book detail view ─────────── */
@@ -402,7 +406,7 @@ body.atlas-chat-expanded .atlas-info {
 	bottom: calc(18px + env(safe-area-inset-bottom));
 	transform: translateX(-50%);
 	z-index: 1400;
-	width: min(560px, 92vw);
+	width: var(--atlas-panel-w);
 	pointer-events: none;
 }
 
