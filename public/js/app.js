@@ -1068,7 +1068,7 @@ function ensureIntroIfNeeded(trigger){
 	if (chatHasUserMessage) return;
 	if (chatMessages.length > 0) return;
 
-	addChatMessage("assistant", "Tell me what kind of queer book you're looking for — vibe, setting, themes, anything. I’ll only recommend from the Atlas list.", {
+	addChatMessage("assistant", "Tell me what kind of story you're looking for, from themes to setting or anything else. I'll find the best fit from our library", {
 		recommendations: [],
 		followUpQuestions: [],
 		actions: []

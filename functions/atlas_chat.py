@@ -570,7 +570,7 @@ def _validate_payload(parsed: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], 
 			assistant_markdown = fallback_md
 
 	if not assistant_markdown:
-		assistant_markdown = "Tell me what kind of book you're looking for — vibe, setting, themes, anything. I’ll only recommend from the Atlas list."
+		assistant_markdown = "Tell me what kind of story you're looking for, from themes to setting or anything else. I'll find the best fit from our library"
 
 	return {
 		"assistant_markdown": assistant_markdown,
@@ -620,7 +620,7 @@ def atlasChat(req: https_fn.Request) -> https_fn.Response:
 
 	if not last_user_text:
 		return _json_response({
-			"assistant_markdown": "Tell me what kind of book you're looking for — vibe, setting, themes, anything. I’ll only recommend from the Atlas list.",
+			"assistant_markdown": "Tell me what kind of story you're looking for, from themes to setting or anything else. I'll find the best fit from our library",
 			"recommendations": [],
 			"follow_up_questions": [],
 			"actions": [],
