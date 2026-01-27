@@ -656,6 +656,101 @@ function clampZoom(z){
 	return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 }
 
+function normalizeIsoValue(value){
+	if (typeof value !== "string") return "";
+	return value.trim().toUpperCase();
+}
+
+function matchesIsoProps(props, iso){
+	if (!props || typeof props !== "object") return false;
+	const target = normalizeIsoValue(iso);
+	if (!target) return false;
+	const keys = ["iso_a2", "iso_3166_1", "iso_3166_1_alpha_2", "iso2", "iso_2", "iso", "country_code"];
+	for (const key of keys){
+		const val = normalizeIsoValue(props[key]);
+		if (val && val === target) return true;
+	}
+	return false;
+}
+
+function labelPointFromLabelLayers(iso){
+	const labelLayerIds = countryLabelLayerIds.length ? countryLabelLayerIds : baseLabelLayerIds;
+	if (!labelLayerIds.length) return null;
+	for (const layerId of labelLayerIds){
+		const layer = map.getLayer(layerId);
+		if (!layer || !layer.source) continue;
+		const sourceLayer = layer["source-layer"];
+		let feats = [];
+		try {
+			feats = map.querySourceFeatures(layer.source, sourceLayer ? { sourceLayer } : {}) || [];
+		} catch(_) {
+			feats = [];
+		}
+		for (const feat of feats){
+			if (!matchesIsoProps(feat?.properties, iso)) continue;
+			const geom = feat?.geometry;
+			if (!geom) continue;
+			if (geom.type === "Point" && Array.isArray(geom.coordinates)) return geom.coordinates;
+			if (geom.type === "MultiPoint" && Array.isArray(geom.coordinates) && geom.coordinates.length) return geom.coordinates[0];
+		}
+	}
+	return null;
+}
+
+function baseLabelLayerForStyle(){
+	const ids = countryLabelLayerIds.length ? countryLabelLayerIds : baseLabelLayerIds;
+	for (const id of ids){
+		if (map.getLayer(id)) return id;
+	}
+	return null;
+}
+
+function syncSelectedLabelStyle(){
+	if (!map.getLayer(LABEL_LAYER_ID)) return;
+	const baseId = baseLabelLayerForStyle();
+	if (!baseId) return;
+	const baseLayer = map.getLayer(baseId);
+	if (!baseLayer) return;
+
+	const layoutKeys = [
+		"text-size","text-font","text-justify","text-anchor","text-padding","text-offset",
+		"text-allow-overlap","text-max-width","text-letter-spacing","text-transform",
+		"text-rotation-alignment","text-keep-upright","text-pitch-alignment","symbol-placement"
+	];
+	const paintKeys = ["text-color","text-halo-color","text-halo-width","text-halo-blur","text-opacity"];
+	const baseLayout = baseLayer.layout || {};
+	const basePaint = baseLayer.paint || {};
+
+	for (const key of layoutKeys){
+		if (Object.prototype.hasOwnProperty.call(baseLayout, key)) {
+			try { map.setLayoutProperty(LABEL_LAYER_ID, key, baseLayout[key]); } catch(_) {}
+		}
+	}
+	for (const key of paintKeys){
+		if (Object.prototype.hasOwnProperty.call(basePaint, key)) {
+			try { map.setPaintProperty(LABEL_LAYER_ID, key, basePaint[key]); } catch(_) {}
+		}
+	}
+}
+
+function selectionPointForIso(iso, fallbackFeature){
+	const labelLayerPoint = labelPointFromLabelLayers(iso);
+	if (labelLayerPoint && labelLayerPoint.length === 2) return labelLayerPoint;
+
+	const fallbackPropsPt = extractLabelPointFromProps(fallbackFeature?.properties || null);
+	if (fallbackPropsPt && fallbackPropsPt.length === 2) return fallbackPropsPt;
+
+	const pt = labelPointForIso(iso);
+	if (pt && pt.length === 2) return pt;
+
+	const bb = bboxOfFeature(fallbackFeature);
+	if (bb){
+		const [[w,s],[e,n]] = bb;
+		return [(w+e)/2, (s+n)/2];
+	}
+	return null;
+}
+
 function setSelectedLabelPoint(lng, lat, labelText){
 	const name = String(labelText || "").trim();
 	if (!name) return false;
@@ -758,26 +853,11 @@ function easeToSelectionPoint(pointLngLat){
 function updateSelectedLabelAndPoint(iso, name, fallbackFeature){
 	const labelText = String(name || "").trim() || fullCountryName(iso, "");
 
-	const fallbackPropsPt = extractLabelPointFromProps(fallbackFeature?.properties || null);
-	if (fallbackPropsPt && fallbackPropsPt.length === 2){
-		setSelectedLabelPoint(fallbackPropsPt[0], fallbackPropsPt[1], labelText);
-		return fallbackPropsPt;
-	}
-
-	const pt = labelPointForIso(iso);
+	const pt = selectionPointForIso(iso, fallbackFeature);
 	if (pt && pt.length === 2){
 		setSelectedLabelPoint(pt[0], pt[1], labelText);
 		return pt;
 	}
-
-	const bb = bboxOfFeature(fallbackFeature);
-	if (bb){
-		const [[w,s],[e,n]] = bb;
-		const mid = [(w+e)/2, (s+n)/2];
-		setSelectedLabelPoint(mid[0], mid[1], labelText);
-		return mid;
-	}
-
 	return null;
 }
 
@@ -854,6 +934,7 @@ function selectIso(iso, name, options){
 	}
 
 	setVisibility(baseLabelLayerIds,"none");
+	syncSelectedLabelStyle();
 	clearSuggestions();
 
 	const labelText = String(name || "").trim() || fullCountryName(iso, "");
@@ -975,8 +1056,9 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 			"text-allow-overlap": false,
 			"text-padding": 2
 		},
-		paint:{ "text-color":"#111", "text-halo-color":"rgba(255,255,255,0.8)", "text-halo-width":1 }
+		paint:{ "text-color":"#fff", "text-halo-color":HIGHLIGHT_COLOR, "text-halo-width":1 }
 	});
+	syncSelectedLabelStyle();
 
 	map.addLayer({ id:HITBOX_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
