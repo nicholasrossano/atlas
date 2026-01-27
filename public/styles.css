@@ -345,6 +345,19 @@ body.atlas-chat-expanded .atlas-info {
 	margin-bottom: auto;
 }
 
+.atlas-book-editor-read {
+	align-self: flex-start;
+	padding: 5px 12px;
+	border-radius: 999px;
+	border: 1px solid #301900;
+	color: #301900;
+	background: transparent;
+	font: 600 10px/1.2 system-ui, -apple-system, "Avenir Next", Avenir, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+	letter-spacing: .02em;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
 .atlas-book-detail-title {
 	font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", Times, serif;
 	font-weight: 700;
