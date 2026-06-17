@@ -1593,7 +1593,8 @@ function restoreChatSession(){
 		chatMessages = [];
 		if (chatThread) chatThread.innerHTML = "";
 		chatIntroInjected = true;
-		chatHasUserMessage = !!payload.hasUserMessage;
+		chatHasUserMessage = payload.hasUserMessage === true
+			|| payload.messages.some(m => m && m.role === "user");
 
 		for (const m of payload.messages){
 			if (m.role === "user"){
@@ -1619,7 +1620,8 @@ function setChatBusy(isBusy){
 	chatIsSending = isBusy;
 	if (chatInput) chatInput.disabled = isBusy;
 	if (chatSendButton) chatSendButton.disabled = isBusy;
-	if (chatClearButton) chatClearButton.disabled = isBusy || !chatHasUserMessage;
+	const canClear = chatHasUserMessage || chatMessages.some(m => m.role === "user" && !m.isLoading);
+	if (chatClearButton) chatClearButton.disabled = isBusy || !canClear;
 }
 
 function autoResizeChatInput(){
@@ -2739,15 +2741,17 @@ function setupChat(){
 	autoResizeChatInput();
 
 	if (chatClearButton){
-		chatClearButton.addEventListener("click", () => {
+		chatClearButton.addEventListener("click", (event) => {
+			event.stopPropagation();
 			if (!chatThread) return;
 			chatMessages = [];
 			chatThread.innerHTML = "";
 			chatIntroInjected = false;
 			chatHasUserMessage = false;
-			expandChat("clear_button");
 			hideFollowUpBar();
 			try { sessionStorage.removeItem(CHAT_STORAGE_KEY); } catch {}
+			expandChat("clear_button");
+			setChatBusy(false);
 			requestAnimationFrame(placeInfoChip);
 		});
 	}
@@ -2770,8 +2774,8 @@ function setupChat(){
 	window.addEventListener("resize", ()=>requestAnimationFrame(placeInfoChip));
 	window.addEventListener("orientationchange", ()=>setTimeout(placeInfoChip,0));
 
-	setChatBusy(false);
 	restoreChatSession();
+	setChatBusy(false);
 }
 setupAppBanner();
 setupChat();

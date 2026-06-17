@@ -709,8 +709,10 @@ body.atlas-chat-expanded .atlas-info {
 }
 
 .atlas-chat-bubble.user{
-	background: var(--atlas-panel-bg);
-	border: var(--atlas-panel-border);
+	background: rgba(255,255,255,0.62);
+	border: 1px solid rgba(0,0,0,0.06);
+	-webkit-backdrop-filter: blur(var(--atlas-blur));
+	backdrop-filter: blur(var(--atlas-blur));
 }
 
 .atlas-chat-bubble.assistant{
