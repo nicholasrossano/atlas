@@ -110,12 +110,14 @@ const map = new maplibregl.Map({
 	minZoom: MIN_ZOOM,
 	maxZoom: MAX_ZOOM,
 	renderWorldCopies: true,
+	preserveDrawingBuffer: true,
 	pitchWithRotate: false,
 	dragRotate: false,
 	touchPitch: false,
 	attributionControl: false,
 	transformRequest: (url) => url.startsWith(API_ROOT) ? ({ url: ensureKey(url) }) : ({ url })
 });
+window.__atlasMap = map;
 
 map.touchZoomRotate.enable(); map.touchZoomRotate.disableRotation();
 map.scrollZoom.enable();
@@ -2104,6 +2106,7 @@ const listFilterTags = new Set();
 let listSections = [];
 let listViewLoading = false;
 let listExpandedBookId = null;
+let listScrollToBookId = null;
 let filterCountryOptions = [];
 
 function buildCountryFilterOptions(records){
@@ -2327,6 +2330,38 @@ function renderListSectionHeader(section){
 	`;
 }
 
+function getListViewScrollPaddingTop(){
+	if (!listViewRoot) return 0;
+	const raw = getComputedStyle(listViewRoot).scrollPaddingTop;
+	const n = parseFloat(raw);
+	return Number.isFinite(n) ? n : 0;
+}
+
+function scrollListViewToElement(targetEl, { behavior = "smooth" } = {}){
+	if (!listViewRoot || !targetEl) return;
+	const paddingTop = getListViewScrollPaddingTop();
+	const scrollerRect = listViewRoot.getBoundingClientRect();
+	const targetRect = targetEl.getBoundingClientRect();
+	const nextTop = listViewRoot.scrollTop + (targetRect.top - scrollerRect.top) - paddingTop;
+	listViewRoot.scrollTo({ top: Math.max(0, nextTop), behavior });
+}
+
+function scrollListViewToBookRow(rowEl){
+	if (!rowEl) return;
+	const section = rowEl.closest(".atlas-list-section");
+	const header = section?.querySelector(".atlas-list-section-header");
+	const booksWrap = section?.querySelector(".atlas-list-section-books");
+	const isFirstInSection = booksWrap?.firstElementChild === rowEl;
+
+	if (isFirstInSection && header){
+		scrollListViewToElement(header);
+		return;
+	}
+
+	const bookEl = rowEl.querySelector(".atlas-book") || rowEl;
+	scrollListViewToElement(bookEl);
+}
+
 async function renderListView(){
 	if (!listViewInner) return;
 
@@ -2375,9 +2410,12 @@ async function renderListView(){
 		listViewInner.innerHTML = html;
 		attachCoverFallbacks(listViewInner);
 
-		if (listExpandedBookId){
-			const expandedRow = listViewInner.querySelector(`.atlas-list-book-row[data-book-id="${CSS.escape(listExpandedBookId)}"]`);
-			if (expandedRow) expandedRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+		const scrollBookId = listScrollToBookId;
+		listScrollToBookId = null;
+		const scrollTargetId = scrollBookId || listExpandedBookId;
+		if (scrollTargetId){
+			const targetRow = listViewInner.querySelector(`.atlas-list-book-row[data-book-id="${CSS.escape(scrollTargetId)}"]`);
+			if (targetRow) requestAnimationFrame(() => scrollListViewToBookRow(targetRow));
 		}
 	} catch (err) {
 		console.error("[atlas] list view render failed:", err);
@@ -2415,6 +2453,7 @@ function toggleListBookRow(rowEl){
 async function openBookInListView(bookId){
 	const records = await loadAllBooks();
 	const book = records.find(r => r.id === bookId);
+	listScrollToBookId = bookId;
 	listExpandedBookId = book && bookHasExpandableContent(book) ? bookId : null;
 	const filtered = applyListFilters(records, {
 		countryIso: listFilterCountry,
