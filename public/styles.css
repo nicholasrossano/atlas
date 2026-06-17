@@ -1478,10 +1478,9 @@ body.atlas-view-list .atlas-list-view {
 .atlas-list-book-main {
 	display: flex;
 	flex-direction: column;
-	justify-content: flex-start;
+	justify-content: center;
 	gap: 5px;
 	min-width: 0;
-	min-height: var(--atlas-list-cover-h);
 }
 .atlas-list-view .atlas-book-editor-read {
 	font-size: 9px;
