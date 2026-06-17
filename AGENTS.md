@@ -24,6 +24,7 @@ Every push to `main` runs **Deploy to Firebase Hosting on merge** with three job
 | `Failed to find location of Firebase Functions SDK` / `python3.14 -m venv` | `firebase-tools` default runtime (3.14) ≠ CI Python (3.12) | Keep `firebase.json` → `functions[].runtime` in sync with workflow `python-version` |
 | `Missing virtual environment at venv directory` | Deploy job skipped venv setup | Run `bash scripts/prepare_functions_venv.sh` before deploy |
 | `Missing permissions ... iam.serviceAccounts.ActAs` | GHA service account lacks roles | Project owner must grant **Service Account User** on `ponder-f84ce@appspot.gserviceaccount.com` (not fixable in repo) |
+| `secretmanager.versions.get` denied on `OPENAI_API_KEY` | GHA deploy SA cannot read Secret Manager | Grant **Secret Manager Secret Accessor** (+ **Secret Manager Viewer**) to the GitHub Actions service account; merge CI deploys `atlasCatalog` always and attempts `atlasChat` with `continue-on-error` until IAM is fixed |
 | Unit tests fail importing Firestore | Eager `firestore.client()` at import | Keep lazy `_get_db()` pattern in `atlas_chat.py` |
 
 ### Required checks before merging CI/deploy changes
