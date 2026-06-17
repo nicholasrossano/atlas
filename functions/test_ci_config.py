@@ -50,6 +50,14 @@ class CIConfigTests(unittest.TestCase):
 		for runtime in RUNTIME_TO_PYTHON:
 			self.assertIn(runtime, content)
 
+	def test_hosting_runtime_config_is_deployable(self):
+		config_path = ROOT / "public/config.js"
+		self.assertTrue(config_path.is_file(), "public/config.js must be committed for Hosting deploys")
+		content = config_path.read_text()
+		self.assertIn("maptiler", content)
+		self.assertIn("apiKey", content)
+		self.assertIn("styleId", content)
+
 
 if __name__ == "__main__":
 	unittest.main()

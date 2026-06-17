@@ -1,4 +1,5 @@
-// Copy to public/config.js and fill in your values (config.js is gitignored).
+// Production runtime config (deployed with Firebase Hosting).
+// Copy to public/config.js for local overrides, or edit config.example.js when forking.
 window.ATLAS_CONFIG = {
 	maptiler: {
 		apiKey: "YOUR_MAPTILER_KEY",

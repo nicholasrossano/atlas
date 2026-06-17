@@ -68,7 +68,7 @@ bash scripts/prepare_functions_venv.sh
 
 ## Hosting / frontend
 
-- Local config: copy `public/config.example.js` → `public/config.js` (gitignored)
+- Local config override: copy `public/config.example.js` → `public/config.js` only if you need different endpoints locally. Production `public/config.js` is committed and deployed with Hosting (MapTiler + Firebase client keys are public browser credentials).
 - Catalog API: `/api/atlas/books` → `atlasCatalog` rewrite in `firebase.json`
 - Book data is **not** read from client Firestore; list/map use the catalog endpoint
 

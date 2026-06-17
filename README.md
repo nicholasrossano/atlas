@@ -27,7 +27,7 @@ PRs and suggestions are also welcome! If you have feedback, ideas, or want to he
 
 ## Local development
 
-1. Copy `public/config.example.js` to `public/config.js` and fill in MapTiler + Atlas API endpoints.
+1. Production runtime config lives in `public/config.js` (deployed with Hosting). For local overrides, copy `public/config.example.js`.
 2. Serve `public/` with any static server. Book data loads from the `atlasCatalog` Cloud Function (not client Firestore), so local UI works best with emulators or a deployed catalog endpoint in config.
 3. Cloud Functions: `cd functions && pip install -r requirements.txt` then deploy or emulate `atlasCatalog` and `atlasChat`.
 4. Do **not** deploy `firestore.rules` from this repo if the Firebase project is shared with Ponder — Atlas reads `atlasBooks` via the Admin SDK in Cloud Functions only.

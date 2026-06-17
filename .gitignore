@@ -6,7 +6,6 @@ yarn-debug.log*
 yarn-error.log*
 firebase-debug.log*
 firebase-debug.*.log*
-public/config.js
 
 # Firebase cache
 .firebase/
@@ -68,9 +67,6 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
-
-# Local runtime config
-public/config.js
 
 # Firebase Functions env + secrets
 # Firebase Functions now loads env files from functions/ (and can auto-create .env.<projectId>)
