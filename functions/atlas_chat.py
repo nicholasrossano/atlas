@@ -312,15 +312,71 @@ def _parse_output_text_json(resp_json: Dict[str, Any]) -> Dict[str, Any]:
 	return {}
 
 
-# ─────────── Recommender (single LLM call) ───────────
-def _recommend_with_llm(
-	api_key: str,
-	history: List[Dict[str, str]],
+# ─────────── Tiered candidate ranking (no exclusion) ───────────
+TIER1_DETAIL_COUNT = int(os.environ.get("ATLAS_CHAT_TIER1_COUNT") or 50)
+
+
+def _tokenize_query(text: str) -> List[str]:
+	norm = _normalize_text(text)
+	return [t for t in norm.split(" ") if len(t) >= 2]
+
+
+def _score_book_for_query(b: Dict[str, Any], query_tokens: List[str], selected_iso2: Optional[str]) -> float:
+	score = 0.0
+	blob = str(b.get("_blob") or "")
+	if query_tokens and blob:
+		for tok in query_tokens:
+			if tok in blob:
+				score += 1.0
+	if selected_iso2:
+		sets = b.get("_iso2_sets") or {}
+		if isinstance(sets, dict):
+			any_set = sets.get("any") or set()
+			if selected_iso2 in any_set:
+				score += 0.5
+	return score
+
+
+def _build_tiered_candidates(
+	all_books: List[Dict[str, Any]],
 	user_text: str,
-	selected_iso2: Optional[str],
-	available_countries: List[Dict[str, str]],
-	candidates: List[Dict[str, Any]]
-) -> Dict[str, Any]:
+	selected_iso2: Optional[str]
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, int]]:
+	if not all_books:
+		return [], [], {"tier1": 0, "tier2": 0, "total": 0}
+
+	tokens = _tokenize_query(user_text)
+	scored: List[Tuple[float, str, Dict[str, Any]]] = []
+	for b in all_books:
+		bid = str(b.get("id") or "")
+		scored.append((_score_book_for_query(b, tokens, selected_iso2), bid, b))
+
+	scored.sort(key=lambda x: (-x[0], x[1]))
+
+	tier1_count = min(TIER1_DETAIL_COUNT, len(scored))
+	tier1 = [b for _, _, b in scored[:tier1_count]]
+	tier1_ids = {str(b.get("id") or "") for b in tier1}
+
+	tier2: List[Dict[str, Any]] = []
+	for _, _, b in scored[tier1_count:]:
+		bid = str(b.get("id") or "")
+		if not bid or bid in tier1_ids:
+			continue
+		places = b.get("_places") or {}
+		if not isinstance(places, dict):
+			places = {}
+		tier2.append({
+			"id": b.get("id"),
+			"title": b.get("title"),
+			"author": b.get("author"),
+			"places": places
+		})
+
+	stats = {"tier1": len(tier1), "tier2": len(tier2), "total": len(all_books)}
+	return tier1, tier2, stats
+
+
+def _compact_detail_candidates(candidates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 	compact: List[Dict[str, Any]] = []
 	for b in candidates:
 		places = b.get("_places") or {}
@@ -337,10 +393,26 @@ def _recommend_with_llm(
 			"places": places,
 			"summary": (b.get("summary") or b.get("description") or "")[:650]
 		})
+	return compact
+
+
+# ─────────── Recommender (single LLM call) ───────────
+def _recommend_with_llm(
+	api_key: str,
+	history: List[Dict[str, str]],
+	user_text: str,
+	selected_iso2: Optional[str],
+	available_countries: List[Dict[str, str]],
+	candidates: List[Dict[str, Any]],
+	candidates_index: Optional[List[Dict[str, Any]]] = None
+) -> Dict[str, Any]:
+	compact = _compact_detail_candidates(candidates)
+	index_compact = candidates_index if isinstance(candidates_index, list) else []
 
 	instructions = (
 		"You are Atlas, a book recommender.\n"
-		"Your only hard constraint is: recommend ONLY books that exist in CANDIDATES.\n\n"
+		"Your only hard constraint is: recommend ONLY books whose id appears in CANDIDATES_DETAIL or CANDIDATES_INDEX.\n"
+		"CANDIDATES_INDEX lists every other catalog book by id/title/author/places with less metadata.\n\n"
 		"Geography behavior:\n"
 		"- The user's prompt is authoritative.\n"
 		"- If the user mentions a specific country, ONLY return books tied to that country.\n"
@@ -348,7 +420,7 @@ def _recommend_with_llm(
 		"- Use AVAILABLE_COUNTRIES as the set of ISO2 codes that exist in the catalog; only choose ISO2 codes that are present there.\n"
 		"- Match the user's requested geography primarily using places.override (country_override). If override is missing, fall back to setting/author.\n"
 		"- selected_iso2 is a UI hint ONLY when the user did not specify a location.\n"
-		"- If you cannot find any matching book(s) in CANDIDATES for the user's geography constraint, return recommendations as an empty list and explain briefly in assistant_markdown.\n\n"
+		"- If you cannot find any matching book(s) in CANDIDATES_DETAIL or CANDIDATES_INDEX for the user's geography constraint, return recommendations as an empty list and explain briefly in assistant_markdown.\n\n"
 		"Output requirements:\n"
 		"- assistant_markdown must be prose only (1–3 sentences). No headings, no bullet points, no numbered lists.\n"
 		"- Each mentioned book must be formatted as: **Title** by Author.\n"
@@ -404,7 +476,11 @@ def _recommend_with_llm(
 		},
 		{
 			"role": "developer",
-			"content": [{"type": "input_text", "text": "CANDIDATES:\n" + json.dumps(compact, ensure_ascii=False)}]
+			"content": [{"type": "input_text", "text": "CANDIDATES_DETAIL:\n" + json.dumps(compact, ensure_ascii=False)}]
+		},
+		{
+			"role": "developer",
+			"content": [{"type": "input_text", "text": "CANDIDATES_INDEX:\n" + json.dumps(index_compact, ensure_ascii=False)}]
 		}
 	]
 
@@ -520,13 +596,13 @@ def _validate_payload(parsed: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], 
 	if not clean_recs:
 		if not assistant_markdown:
 			assistant_markdown = "I couldn’t find a match for that in the Atlas catalog yet. Try a different country/region or tell me a different vibe, and I’ll stick to what’s in the list."
-		return {
+		return _attach_book_display({
 			"assistant_markdown": assistant_markdown,
 			"recommendations": [],
 			"follow_up_questions": clean_fups,
 			"actions": [],
 			"build": ATLAS_CHAT_BUILD
-		}
+		}, by_id)
 
 	if assistant_markdown:
 		md_norm = _normalize_text(assistant_markdown)
@@ -549,13 +625,33 @@ def _validate_payload(parsed: Dict[str, Any], by_id: Dict[str, Dict[str, Any]], 
 	if not assistant_markdown:
 		assistant_markdown = "Tell me what kind of story you're looking for, from themes to setting or anything else. I'll find the best fit from our library"
 
-	return {
+	out = {
 		"assistant_markdown": assistant_markdown,
 		"recommendations": clean_recs,
 		"follow_up_questions": clean_fups,
 		"actions": [],
 		"build": ATLAS_CHAT_BUILD
 	}
+	return _attach_book_display(out, by_id)
+
+
+def _attach_book_display(clean: Dict[str, Any], by_id: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+	books: List[Dict[str, str]] = []
+	for r in clean.get("recommendations") or []:
+		if not isinstance(r, dict):
+			continue
+		bid = r.get("book_id")
+		if not isinstance(bid, str):
+			continue
+		b = by_id.get(bid) or {}
+		books.append({
+			"book_id": bid,
+			"title": str(b.get("title") or "").strip(),
+			"author": str(b.get("author") or "").strip(),
+			"cover_url": str(b.get("cover_url") or "").strip(),
+		})
+	clean["books"] = books
+	return clean
 
 
 # ─────────── HTTP Function ───────────
@@ -632,23 +728,30 @@ def atlasChat(req: https_fn.Request) -> https_fn.Response:
 			history.append({"role": role, "content": content.strip()})
 
 	try:
-		candidates = all_books  # send full catalog (≈200)
+		tier1, tier2, tier_stats = _build_tiered_candidates(all_books, last_user_text, selected_iso2)
 
-		parsed = _recommend_with_llm(
-			api_key=api_key,
-			history=history,
-			user_text=last_user_text,
-			selected_iso2=selected_iso2,
-			available_countries=available_countries or [],
-			candidates=candidates
-		)
+		def _call_recommender(detail: List[Dict[str, Any]], index: List[Dict[str, Any]]) -> Dict[str, Any]:
+			return _recommend_with_llm(
+				api_key=api_key,
+				history=history,
+				user_text=last_user_text,
+				selected_iso2=selected_iso2,
+				available_countries=available_countries or [],
+				candidates=detail,
+				candidates_index=index
+			)
+
+		parsed = _call_recommender(tier1, tier2)
+		if not parsed:
+			parsed = _call_recommender(all_books, [])
 
 		clean = _validate_payload(parsed, by_id, last_user_text)
 
 		if debug:
 			clean["debug"] = {
-				"candidates": len(candidates),
-				"catalog_total": len(all_books),
+				"tier1": tier_stats.get("tier1"),
+				"tier2": tier_stats.get("tier2"),
+				"catalog_total": tier_stats.get("total"),
 				"countries": len(available_countries or []),
 				"selected_iso2": selected_iso2,
 				"model": ATLAS_CHAT_MODEL,

@@ -1,7 +1,7 @@
 // Atlas/public/js/app.js
 
 // ─────────── Section Header ───────────
-console.log("[atlas] app.js v16 booting");
+console.log("[atlas] app.js v18 booting");
 
 // ─────────── Section Header ───────────
 const atlasConfig = window.ATLAS_CONFIG || {};
@@ -87,6 +87,8 @@ map.touchZoomRotate.enable(); map.touchZoomRotate.disableRotation();
 map.scrollZoom.enable();
 map.boxZoom.disable(); map.doubleClickZoom.disable();
 
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+
 function clampLatNow(){
 	const c = map.getCenter();
 	const clampedLat = Math.max(MIN_LAT, Math.min(MAX_LAT, c.lat));
@@ -117,9 +119,12 @@ let baseLabelLayerIds=[], borderLineLayerIds=[], continentLabelLayerIds=[], coun
 const infoBox   = document.getElementById("atlas-info");
 const infoFlag  = document.getElementById("atlas-flag");
 const infoName  = document.getElementById("atlas-name");
+const bookCountEl = document.getElementById("atlas-book-count");
 const booksList = document.getElementById("atlas-books");
 const emptyMsg  = document.getElementById("atlas-empty");
-const searchInner = document.querySelector(".atlas-chat-shell");
+const chatShell = document.querySelector(".atlas-chat-shell");
+const atlasHeader = document.querySelector(".atlas-header");
+const mapResetButton = document.getElementById("atlas-map-reset");
 
 // ─────────── Section Header ───────────
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
@@ -214,18 +219,98 @@ function normalizeCountryToken(value){
 	return trimmed.toUpperCase();
 }
 
-function normalizeTokenList(field){
-	const tokens = [];
+let _countryNameToIso2Cache = null;
+
+function listIso2Codes(){
+	if (typeof Intl.supportedValuesOf === "function") {
+		return Intl.supportedValuesOf("region").filter(code => typeof code === "string" && code.length === 2);
+	}
+	const out = [];
+	for (let i = 65; i <= 90; i++) {
+		for (let j = 65; j <= 90; j++) {
+			const code = String.fromCharCode(i) + String.fromCharCode(j);
+			try {
+				const name = regionNames.of(code);
+				if (name && name !== code) out.push(code);
+			} catch (_) {}
+		}
+	}
+	return out;
+}
+
+function getCountryNameToIso2Map(){
+	if (_countryNameToIso2Cache) return _countryNameToIso2Cache;
+	const map = new Map();
+	for (const code of listIso2Codes()) {
+		try {
+			const name = regionNames.of(code);
+			if (name) map.set(name.trim().toLowerCase(), code.toUpperCase());
+		} catch (_) {}
+	}
+	_countryNameToIso2Cache = map;
+	return map;
+}
+
+function countryStringToIso2(val){
+	if (val == null) return null;
+	if (typeof val === "object") return null;
+	let raw = "";
+	try { raw = String(val).trim(); } catch (_) { return null; }
+	if (!raw) return null;
+
+	const t = raw.replace(/_/g, " ").replace(/-/g, " ").trim();
+	if (t.length === 2 && /^[a-zA-Z]{2}$/.test(t)) return t.toUpperCase();
+
+	const byName = getCountryNameToIso2Map().get(t.toLowerCase());
+	if (byName) return byName;
+	return null;
+}
+
+function extractIso2Candidates(val){
+	const out = [];
 	const seen = new Set();
-	const push = (val) => {
-		const norm = normalizeCountryToken(val);
-		if (!norm || seen.has(norm)) return;
-		seen.add(norm);
-		tokens.push(norm);
+	const add = (x) => {
+		const iso2 = countryStringToIso2(x);
+		if (!iso2 || seen.has(iso2)) return;
+		seen.add(iso2);
+		out.push(iso2);
 	};
-	if (Array.isArray(field)) field.forEach(push);
-	else push(field);
-	return tokens;
+
+	if (val && typeof val === "object" && !Array.isArray(val)) {
+		for (const key of ["iso2", "code", "country", "value", "name"]) {
+			if (key in val) add(val[key]);
+		}
+		for (const v of Object.values(val)) {
+			if (typeof v === "string") add(v);
+			else if (Array.isArray(v)) v.forEach(add);
+		}
+	} else if (Array.isArray(val)) {
+		val.forEach(add);
+	} else if (typeof val === "string") {
+		for (const part of val.split(/[,;|/]/)) add(part.trim());
+	} else {
+		add(val);
+	}
+	return out;
+}
+
+function iso2SetsForRecord(data){
+	const override = extractIso2Candidates(data?.country_override);
+	const setting = extractIso2Candidates(data?.setting_country);
+	const author = [
+		...extractIso2Candidates(data?.author_country),
+		...extractIso2Candidates(data?.author_origin)
+	];
+	const anySet = new Set([...override, ...setting, ...author]);
+	return { override, setting, author, any: Array.from(anySet) };
+}
+
+function hasIso2Match(iso2Sets, candidates){
+	const pool = iso2Sets?.any;
+	if (!Array.isArray(pool) || !pool.length || !candidates.length) return false;
+	const wanted = new Set(candidates);
+	for (const iso of pool) if (wanted.has(iso)) return true;
+	return false;
 }
 
 function normalizeTagList(field){
@@ -243,11 +328,48 @@ function normalizeTagList(field){
 	return out;
 }
 
-function hasTokenMatch(tokens, candidates){
-	if (!tokens.length || !candidates.length) return false;
-	const pool = new Set(tokens);
-	for (const cand of candidates) if (pool.has(cand)) return true;
-	return false;
+function buildLoadingSkeleton(){
+	return `
+<div class="atlas-loading">
+  <div class="atlas-loading-row"><div class="atlas-loading-cover"></div><div class="atlas-loading-lines"><div class="atlas-loading-line long"></div><div class="atlas-loading-line short"></div></div></div>
+  <div class="atlas-loading-row"><div class="atlas-loading-cover"></div><div class="atlas-loading-lines"><div class="atlas-loading-line long"></div><div class="atlas-loading-line short"></div></div></div>
+</div>`;
+}
+
+function updateBookCountLabel(count){
+	if (!bookCountEl) return;
+	if (count == null || !Number.isFinite(count) || count <= 0){
+		bookCountEl.hidden = true;
+		bookCountEl.textContent = "";
+		return;
+	}
+	const label = count === 1 ? "1 book" : `${count} books`;
+	bookCountEl.textContent = `· ${label}`;
+	bookCountEl.hidden = false;
+}
+
+function renderBookListRow(it, idx){
+	const title = String(it.title || "").trim() || "Untitled";
+	const author = String(it.author || "").trim() || "Unknown";
+	const cover = String(it.cover_url || "").trim() || PLACEHOLDER_COVER;
+	const safeAlt = `Cover of '${title}'`;
+	return `
+   <div class="atlas-book" data-idx="${idx}">
+  <img class="atlas-book-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
+  <div class="atlas-book-meta">
+ <div class="atlas-book-title">${escapeHtml(title)}</div>
+ <div class="atlas-book-author">${escapeHtml(author)}</div>
+  </div>
+   </div>
+ `;
+}
+
+function attachCoverFallbacks(root){
+	if (!root) return;
+	[...root.querySelectorAll(".atlas-book-cover, .atlas-book-detail-cover, .atlas-chat-rec-cover")].forEach(img=>{
+		img.addEventListener("error", ()=>{ img.src = PLACEHOLDER_COVER; }, { once: true });
+		if (!img.getAttribute("src")) img.src = PLACEHOLDER_COVER;
+	});
 }
 
 // ─────────── Section Header ───────────
@@ -273,7 +395,7 @@ async function loadAllBooks(db){
 					bookshop_url: bookshopUrl,
 					tags: normalizeTagList(data.tags),
 					read: data.read === true,
-					overrideTokens: normalizeTokenList(data.country_override)
+					iso2Sets: iso2SetsForRecord(data)
 				});
 			});
 			console.log(`[atlas] cached ${records.length} book(s) from ${BOOKS_COLLECTION}`);
@@ -291,7 +413,7 @@ async function loadAllBooks(db){
 function computeAvailableIsoList(records){
 	const out = new Set();
 	for (const rec of records){
-		for (const t of (rec.overrideTokens || [])){
+		for (const t of (rec.iso2Sets?.any || [])){
 			if (t && typeof t === "string" && t.length === 2) out.add(t.toUpperCase());
 		}
 	}
@@ -300,18 +422,19 @@ function computeAvailableIsoList(records){
 }
 
 // ─────────── Section Header ───────────
-function availabilityPaintExpr(){
+function availabilityPaintExpr(list){
 	return [
 		"case",
 		["==", ["get","iso_a2"], "AQ"], "rgba(0,0,0,0)",
-		HIGHLIGHT_COLOR
+		["in", ["get","iso_a2"], ["literal", list]], HIGHLIGHT_COLOR,
+		BLUSH_COLOR
 	];
 }
 
 function updateAvailabilityStyle(){
 	if (!map.getLayer(AVAIL_LAYER_ID)) return;
 	try {
-		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr());
+		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr(_availableIsoList));
 	} catch(_) {}
 }
 
@@ -325,7 +448,7 @@ async function fetchBooksByCountry(iso2){
 		if (STUB_EVERYWHERE) {
 			return [{ title:"Lie with Me", author:"Philippe Besson", cover_url:"https://books.google.com/books/content?id=rvePDwAAQBAJ&printsec=frontcover&img=1&zoom=1&edge=curl&source=gbs_api" }];
 		}
-		return [];
+		throw new Error("Firestore not configured");
 	}
 
 	if (!ISO) return [];
@@ -345,7 +468,7 @@ async function fetchBooksByCountry(iso2){
 			throw err;
 		}
 
-		const items = records.filter(rec => hasTokenMatch(rec.overrideTokens || [], normalizedCandidates));
+		const items = records.filter(rec => hasIso2Match(rec.iso2Sets, normalizedCandidates));
 
 		items.sort((a,b)=>String(a.title||"").localeCompare(String(b.title||"")));
 		console.log("[atlas] fetched", items.length, "book(s) for", ISO, "from cache");
@@ -360,8 +483,11 @@ async function fetchBooksByCountry(iso2){
 	return promise;
 }
 
+const EMPTY_CATALOG_MSG = `We don't have any books from this country yet. If you have one you'd recommend, please let us know <a href="https://forms.gle/ZwvqKmMmUNZfWrcd8" target="_blank" rel="noopener">here</a>.`;
+const EMPTY_LOAD_ERROR_MSG = "Couldn't load books right now. Try again in a moment.";
+
 // ─────────── Section Header ───────────
-function renderBooks(items, iso){
+function renderBooks(items, iso, options = {}){
 	if (!booksList || !emptyMsg) return;
 
 	lastBooksIso = iso;
@@ -372,35 +498,21 @@ function renderBooks(items, iso){
 	if (!Array.isArray(items) || items.length === 0){
 		booksList.innerHTML = "";
 		booksList.hidden = true;
+		emptyMsg.innerHTML = options.status === "error" ? EMPTY_LOAD_ERROR_MSG : EMPTY_CATALOG_MSG;
 		emptyMsg.hidden = false;
-		console.log("[atlas] empty list for", iso);
+		updateBookCountLabel(0);
+		console.log("[atlas] empty list for", iso, options.status || "empty");
 		return;
 	}
 
-	const html = items.map((it, idx) => {
-		const title = String(it.title || "").trim() || "Untitled";
-		const author = String(it.author || "").trim() || "Unknown";
-		const cover = String(it.cover_url || "").trim() || PLACEHOLDER_COVER;
-		const safeAlt = `Cover of '${title}'`;
-		return `
-   <div class="atlas-book" data-idx="${idx}">
-  <img class="atlas-book-cover" src="${cover}" alt="${escapeHtml(safeAlt)}">
-  <div class="atlas-book-meta">
- <div class="atlas-book-title">${escapeHtml(title)}</div>
- <div class="atlas-book-author">${escapeHtml(author)}</div>
-  </div>
-   </div>
- `;
-	}).join("");
+	const html = items.map((it, idx) => renderBookListRow(it, idx)).join("");
 
 	booksList.innerHTML = html;
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
+	updateBookCountLabel(items.length);
 
-	[...booksList.querySelectorAll(".atlas-book-cover")].forEach(img=>{
-		img.addEventListener("error", ()=>{ img.src = PLACEHOLDER_COVER; }, { once: true });
-		if (!img.getAttribute("src")) img.src = PLACEHOLDER_COVER;
-	});
+	attachCoverFallbacks(booksList);
 
 	console.log("[atlas] rendered", items.length, "book(s) for", iso);
 }
@@ -459,7 +571,7 @@ function showBookDetail(book, iso){
   <button type="button" class="atlas-book-back" aria-label="Close book">×</button>
    </div>
    <div class="atlas-book-detail-main">
-  <img class="atlas-book-detail-cover" src="${cover}" alt="${escapeHtml(safeAlt)}">
+  <img class="atlas-book-detail-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
   <div class="atlas-book-detail-meta">
   <div class="atlas-book-detail-text">
    ${editorReadHtml}
@@ -479,11 +591,7 @@ function showBookDetail(book, iso){
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
 
-	const coverImg = booksList.querySelector(".atlas-book-detail-cover");
-	if (coverImg){
-		coverImg.addEventListener("error", ()=>{ coverImg.src = PLACEHOLDER_COVER; }, { once: true });
-		if (!coverImg.getAttribute("src")) coverImg.src = PLACEHOLDER_COVER;
-	}
+	attachCoverFallbacks(booksList);
 
 	const backButton = booksList.querySelector(".atlas-book-back");
 	if (backButton){
@@ -514,42 +622,66 @@ if (booksList) {
 }
 
 // ─────────── Section Header ───────────
+function getMapOverlayPadding(){
+	const headerH = atlasHeader ? Math.ceil(atlasHeader.getBoundingClientRect().height) + 20 : 90;
+	let bottom = 100;
+	if (chatShell){
+		bottom = Math.ceil(chatShell.getBoundingClientRect().height) + 24;
+	}
+	if (infoBox && infoBox.classList.contains("is-visible") && !document.body.classList.contains("atlas-chat-expanded")){
+		bottom += Math.ceil(infoBox.getBoundingClientRect().height) + 12;
+	}
+	document.documentElement.style.setProperty("--atlas-overlays-top", `${headerH}px`);
+	if (chatShell){
+		document.documentElement.style.setProperty("--atlas-chat-h", `${Math.ceil(chatShell.getBoundingClientRect().height)}px`);
+	}
+	return { top: headerH, right: 90, bottom, left: 90 };
+}
+
 function isMobile(){ return window.matchMedia("(max-width: 520px)").matches; }
 
 function rectsOverlap(a,b){
 	return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
 }
-function placeInfoChip(){
-	if (!infoBox.classList.contains("is-visible")) return;
-	if (document.body.classList.contains("atlas-chat-expanded")) return;
-	if (infoBox.classList.contains("is-suppressed")) return;
 
-	if (isMobile()) {
-		if (searchInner) {
-			const sh = Math.ceil(searchInner.getBoundingClientRect().height) || 56;
-			infoBox.style.setProperty("--atlas-search-h", `${sh}px`);
-		}
-		infoBox.classList.add("stacked");
+function placeInfoChip(){
+	if (!infoBox || !infoBox.classList.contains("is-visible")) return;
+	if (document.body.classList.contains("atlas-chat-expanded")) return;
+
+	getMapOverlayPadding();
+
+	if (!chatShell){
+		infoBox.style.setProperty("--atlas-stack-extra", "0px");
+		infoBox.classList.remove("stacked");
 		return;
 	}
 
-	if (!searchInner) { infoBox.classList.remove("stacked"); return; }
-	const sh = Math.ceil(searchInner.getBoundingClientRect().height) || 56;
-	infoBox.style.setProperty("--atlas-search-h", `${sh}px`);
+	const chatRect = chatShell.getBoundingClientRect();
+	const chatH = Math.ceil(chatRect.height) || 56;
+	infoBox.style.setProperty("--atlas-chat-h", `${chatH}px`);
 
-	const infoRect   = infoBox.getBoundingClientRect();
-	const searchRect = searchInner.getBoundingClientRect();
-	if (rectsOverlap(infoRect, searchRect)) infoBox.classList.add("stacked");
-	else infoBox.classList.remove("stacked");
+	requestAnimationFrame(() => {
+		if (!infoBox.classList.contains("is-visible")) return;
+		const infoRect = infoBox.getBoundingClientRect();
+		const chatRect2 = chatShell.getBoundingClientRect();
+		if (rectsOverlap(infoRect, chatRect2)){
+			const overlapPx = Math.max(0, Math.ceil(infoRect.bottom - chatRect2.top + 12));
+			infoBox.style.setProperty("--atlas-stack-extra", `${overlapPx}px`);
+			infoBox.classList.add("stacked");
+		} else {
+			infoBox.style.setProperty("--atlas-stack-extra", "0px");
+			infoBox.classList.remove("stacked");
+		}
+	});
 }
+
 function showInfo(iso,name){
 	infoFlag.textContent = isoToFlagEmoji(iso);
 	infoName.textContent = name || iso || "—";
+	updateBookCountLabel(null);
 	if (infoBox) infoBox.classList.remove("is-book-detail");
 
-	if (isMobile()) clearSuggestions();
-
-	booksList.innerHTML = `<div class="atlas-loading">Loading…</div>`;
+	booksList.innerHTML = buildLoadingSkeleton();
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
 	infoBox.classList.add("is-visible");
@@ -558,7 +690,7 @@ function showInfo(iso,name){
 	lastBooksIso = iso;
 	fetchBooksByCountry(iso)
 	.then(items => { if (iso === lastBooksIso) renderBooks(items, iso); })
-	.catch(err => { console.error(err); if (iso === lastBooksIso) renderBooks([], iso); });
+	.catch(err => { console.error(err); if (iso === lastBooksIso) renderBooks([], iso, { status: "error" }); });
 }
 function hideInfo(){
 	if (infoBox) infoBox.classList.remove("is-book-detail");
@@ -618,8 +750,9 @@ function centerOnFeature(feature) {
 	const raw = bboxOfFeature(feature);
 	if (!raw) return;
 	const clamped = clampBoundsLat(raw);
+	const padding = getMapOverlayPadding();
 	map.fitBounds(clamped, {
-		padding: { top: 90, right: 90, bottom: 100, left: 90 },
+		padding,
 		maxZoom: Math.min(4.5, MAX_ZOOM),
 		duration: SELECT_DURATION_MS,
 		linear: false
@@ -629,8 +762,9 @@ function centerOnBounds(bbox) {
 	if (!bbox || bbox.length !== 4) return;
 	const [[w,s],[e,n]] = [[bbox[0], bbox[1]],[bbox[2], bbox[3]]];
 	const clamped = clampBoundsLat([[w,s],[e,n]]);
+	const padding = getMapOverlayPadding();
 	map.fitBounds(clamped, {
-		padding: { top: 90, right: 90, bottom: 100, left: 90 },
+		padding,
 		maxZoom: Math.min(4.5, MAX_ZOOM),
 		duration: SELECT_DURATION_MS,
 		linear: false
@@ -1010,14 +1144,15 @@ function selectIso(iso, name, options){
 
 	setVisibility(baseLabelLayerIds,"none");
 	syncSelectedLabelStyle();
-	clearSuggestions();
 
 	const infoName = String(name || "").trim() || fullCountryName(iso, "");
 	const baseLabel = labelTextFromLabelLayers(iso) || infoName;
 	const labelText = baseLabel ? baseLabel.toUpperCase() : infoName.toUpperCase();
 	const pt = updateSelectedLabelAndPoint(iso, labelText, pickedFeature);
 
-	if (pt) {
+	if (pickedFeature) {
+		centerOnFeature(pickedFeature);
+	} else if (pt) {
 		easeToSelectionPoint(pt);
 	} else {
 		const attempt = () => {
@@ -1033,7 +1168,8 @@ function selectIso(iso, name, options){
 }
 
 function handlePickAtPoint(point){
-	const pad=10; const box=[[point.x-pad,point.y-pad],[point.x+pad,point.y+pad]];
+	const pad = isMobile() ? 18 : 10;
+	const box=[[point.x-pad,point.y-pad],[point.x+pad,point.y+pad]];
 	const hit=map.queryRenderedFeatures(box,{layers:[HITBOX_LAYER_ID]});
 	if(hit.length){
 		const f   = hit[0];
@@ -1079,7 +1215,7 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 	map.addLayer({ id:AVAIL_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{
-			"fill-color": availabilityPaintExpr(),
+			"fill-color": availabilityPaintExpr(_availableIsoList),
 			"fill-opacity": AVAIL_OPACITY,
 			"fill-outline-color": BORDER_COLOR,
 			"fill-color-transition": layerFadeTransition(),
@@ -1168,6 +1304,19 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 	})();
 });
 
+function resetMapView(){
+	resetSelection();
+	map.easeTo({
+		center: INITIAL_CENTER,
+		zoom: INITIAL_ZOOM,
+		duration: SELECT_DURATION_MS
+	});
+}
+
+if (mapResetButton){
+	mapResetButton.addEventListener("click", () => resetMapView());
+}
+
 // ─────────── Section Header ───────────
 const chatThread = document.getElementById("atlas-chat-thread");
 const chatInput = document.getElementById("atlas-chat-input");
@@ -1176,6 +1325,9 @@ const chatClearButton = document.getElementById("atlas-chat-clear");
 
 const chatRoot = document.getElementById("atlas-chat");
 const chatInputRow = chatInput ? chatInput.closest(".atlas-chat-input-row") : null;
+const chatFollowupsBar = document.getElementById("atlas-chat-followups");
+
+const CHAT_STORAGE_KEY = "atlas_curator_chat_v1";
 
 let chatIsExpanded = false;
 let chatIntroInjected = false;
@@ -1213,6 +1365,8 @@ function collapseChat(trigger, options){
 		chatHasUserMessage = false;
 		if (chatThread) chatThread.innerHTML = "";
 		chatMessages = [];
+		hideFollowUpBar();
+		try { sessionStorage.removeItem(CHAT_STORAGE_KEY); } catch {}
 	}
 	if (chatInput){
 		chatInput.blur();
@@ -1246,7 +1400,90 @@ const chatSessionId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}
 let chatIsSending = false;
 let chatMessages = [];
 
-function clearSuggestions(){}
+function hideFollowUpBar(){
+	if (!chatFollowupsBar) return;
+	chatFollowupsBar.innerHTML = "";
+	chatFollowupsBar.hidden = true;
+	requestAnimationFrame(placeInfoChip);
+}
+
+function renderFollowUpBar(questions){
+	if (!chatFollowupsBar) return;
+	chatFollowupsBar.innerHTML = "";
+	const qs = Array.isArray(questions)
+		? questions.map(q => String(q || "").trim()).filter(Boolean)
+		: [];
+	if (!qs.length || !chatIsExpanded || chatIsSending){
+		hideFollowUpBar();
+		return;
+	}
+	for (const q of qs.slice(0, 2)){
+		const btn = document.createElement("button");
+		btn.type = "button";
+		btn.className = "atlas-chat-followup";
+		btn.textContent = q;
+		btn.addEventListener("click", () => {
+			hideFollowUpBar();
+			expandChat("followup_chip");
+			submitChat(q, "followup_chip");
+		});
+		chatFollowupsBar.appendChild(btn);
+	}
+	chatFollowupsBar.hidden = false;
+	requestAnimationFrame(placeInfoChip);
+}
+
+function saveChatSession(){
+	try {
+		const payload = {
+			messages: chatMessages
+				.filter(m => !m.isLoading)
+				.map(m => ({
+					role: m.role,
+					text: m.text,
+					markdown: m.markdown,
+					recommendations: m.recommendations || [],
+					followUpQuestions: m.followUpQuestions || []
+				})),
+			hasUserMessage: chatHasUserMessage
+		};
+		sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(payload));
+	} catch (err) {
+		console.warn("[atlas chat] save session failed", err);
+	}
+}
+
+function restoreChatSession(){
+	try {
+		const raw = sessionStorage.getItem(CHAT_STORAGE_KEY);
+		if (!raw) return;
+		const payload = JSON.parse(raw);
+		if (!payload || !Array.isArray(payload.messages) || !payload.messages.length) return;
+
+		chatMessages = [];
+		if (chatThread) chatThread.innerHTML = "";
+		chatIntroInjected = true;
+		chatHasUserMessage = !!payload.hasUserMessage;
+
+		for (const m of payload.messages){
+			if (m.role === "user"){
+				addChatMessage("user", m.text || "", {});
+			} else if (m.role === "assistant"){
+				addChatMessage("assistant", m.markdown || "", {
+					recommendations: m.recommendations || [],
+					followUpQuestions: m.followUpQuestions || []
+				});
+			}
+		}
+
+		const lastAssistant = [...chatMessages].reverse().find(m => m.role === "assistant" && !m.isLoading);
+		if (lastAssistant && lastAssistant.followUpQuestions?.length){
+			renderFollowUpBar(lastAssistant.followUpQuestions);
+		}
+	} catch (err) {
+		console.warn("[atlas chat] restore session failed", err);
+	}
+}
 
 function setChatBusy(isBusy){
 	chatIsSending = isBusy;
@@ -1385,7 +1622,7 @@ function createChatRowElement(message){
 				const recWrap = document.createElement("div");
 				recWrap.className = "atlas-chat-recs";
 				assistantContent.appendChild(recWrap);
-				renderRecommendationCards(recWrap, message.recommendations);
+				renderRecommendationCards(recWrap, message.recommendations, message.books);
 			}
 		}
 
@@ -1405,6 +1642,7 @@ function addChatMessage(role, text, payload){
 		isLoading: !!(payload && payload.isLoading),
 		recommendations: payload && Array.isArray(payload.recommendations) ? payload.recommendations : [],
 		followUpQuestions: payload && Array.isArray(payload.followUpQuestions) ? payload.followUpQuestions : [],
+		books: payload && Array.isArray(payload.books) ? payload.books : [],
 		actions: payload && Array.isArray(payload.actions) ? payload.actions : [],
 		element: null
 	};
@@ -1414,6 +1652,7 @@ function addChatMessage(role, text, payload){
 		scrollChatToBottom();
 		requestAnimationFrame(placeInfoChip);
 	}
+	if (!msg.isLoading) saveChatSession();
 	return msg;
 }
 
@@ -1422,8 +1661,9 @@ function replaceAssistantMessage(placeholder, assistantMarkdown, payload){
 	placeholder.isLoading = false;
 	placeholder.markdown = String(assistantMarkdown || "");
 	placeholder.recommendations = payload && Array.isArray(payload.recommendations) ? payload.recommendations : [];
-	placeholder.followUpQuestions = [];
+	placeholder.followUpQuestions = payload && Array.isArray(payload.followUpQuestions) ? payload.followUpQuestions : [];
 	placeholder.actions = payload && Array.isArray(payload.actions) ? payload.actions : [];
+	placeholder.books = payload && Array.isArray(payload.books) ? payload.books : [];
 
 	if (!placeholder.element) return;
 	const content = placeholder.element.querySelector(".atlas-chat-assistant");
@@ -1436,9 +1676,11 @@ function replaceAssistantMessage(placeholder, assistantMarkdown, payload){
 		const recWrap = document.createElement("div");
 		recWrap.className = "atlas-chat-recs";
 		content.appendChild(recWrap);
-		renderRecommendationCards(recWrap, placeholder.recommendations);
+		renderRecommendationCards(recWrap, placeholder.recommendations, placeholder.books);
 	}
 
+	renderFollowUpBar(placeholder.followUpQuestions);
+	saveChatSession();
 	scrollChatToBottom();
 	requestAnimationFrame(placeInfoChip);
 }
@@ -1459,10 +1701,14 @@ async function ensureBooksByIdMap(){
 }
 
 function primaryIsoForBook(book){
-	const arr = book?.overrideTokens;
-	if (!Array.isArray(arr)) return null;
-	for (const item of arr){
-		if (typeof item === "string" && item.length === 2) return item.toUpperCase();
+	const sets = book?.iso2Sets;
+	if (!sets) return null;
+	for (const key of ["override", "setting", "author"]) {
+		const arr = sets[key];
+		if (!Array.isArray(arr) || !arr.length) continue;
+		for (const iso of arr) {
+			if (typeof iso === "string" && iso.length === 2) return iso.toUpperCase();
+		}
 	}
 	return null;
 }
@@ -1553,9 +1799,15 @@ function focusCountryFromChat(iso){
 	requestAnimationFrame(placeInfoChip);
 }
 
-function renderRecommendationCards(container, recs){
+function renderRecommendationCards(container, recs, apiBooks){
 	if (!container) return;
 	container.innerHTML = "";
+	const bookMap = new Map();
+	if (Array.isArray(apiBooks)){
+		for (const b of apiBooks){
+			if (b && b.book_id) bookMap.set(String(b.book_id), b);
+		}
+	}
 	const limited = recs.slice(0, 5);
 	for (const rec of limited){
 		const bookId = String(rec && rec.book_id ? rec.book_id : "");
@@ -1567,6 +1819,7 @@ function renderRecommendationCards(container, recs){
 		const cover = document.createElement("img");
 		cover.className = "atlas-chat-rec-cover";
 		cover.alt = "Book cover";
+		cover.loading = "lazy";
 		cover.src = PLACEHOLDER_COVER;
 
 		const meta = document.createElement("div");
@@ -1593,21 +1846,28 @@ function renderRecommendationCards(container, recs){
 		card.appendChild(arrow);
 		container.appendChild(card);
 
-		ensureBooksByIdMap().then(byId => {
-			const book = byId.get(bookId);
+		const hydrate = (book) => {
 			if (!book) return;
 			const safeTitle = String(book.title || "").trim() || "Untitled";
 			const safeAuthor = String(book.author || "").trim() || "Unknown";
 			const safeCover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
-
 			title.textContent = safeTitle;
 			author.textContent = safeAuthor;
 			cover.src = safeCover;
-			cover.addEventListener("error", () => { cover.src = PLACEHOLDER_COVER; }, { once: true });
-
 			card.disabled = false;
 			card.addEventListener("click", () => openBookFromChat(bookId));
-		});
+			attachCoverFallbacks(card);
+		};
+
+		const fromApi = bookMap.get(bookId);
+		if (fromApi && fromApi.title){
+			hydrate(fromApi);
+		} else {
+			ensureBooksByIdMap().then(byId => {
+				const book = byId.get(bookId);
+				if (book) hydrate(book);
+			});
+		}
 	}
 }
 
@@ -1630,6 +1890,7 @@ async function submitChat(rawText, trigger){
 
 	addChatMessage("user", text, {});
 	chatHasUserMessage = true;
+	hideFollowUpBar();
 	chatInput.value = "";
 	autoResizeChatInput();
 
@@ -1661,12 +1922,14 @@ async function submitChat(rawText, trigger){
 		const data = await response.json();
 		const assistantMarkdown = String(data.assistant_markdown || "");
 		const recommendations = Array.isArray(data.recommendations) ? data.recommendations : [];
-		const followUps = [];
+		const followUps = Array.isArray(data.follow_up_questions) ? data.follow_up_questions : [];
+		const books = Array.isArray(data.books) ? data.books : [];
 		const actions = Array.isArray(data.actions) ? data.actions : [];
 
 		replaceAssistantMessage(placeholder, assistantMarkdown, {
 			recommendations,
 			followUpQuestions: followUps,
+			books,
 			actions
 		});
 
@@ -1688,6 +1951,7 @@ async function submitChat(rawText, trigger){
 		replaceAssistantMessage(placeholder, "Sorry — something went wrong talking to the book brain. Try again in a sec.", {
 			recommendations: [],
 			followUpQuestions: [],
+			books: [],
 			actions: []
 		});
 	} finally {
@@ -1733,6 +1997,8 @@ function setupChat(){
 			chatIntroInjected = false;
 			chatHasUserMessage = false;
 			expandChat("clear_button");
+			hideFollowUpBar();
+			try { sessionStorage.removeItem(CHAT_STORAGE_KEY); } catch {}
 			requestAnimationFrame(placeInfoChip);
 		});
 	}
@@ -1750,5 +2016,6 @@ function setupChat(){
 	window.addEventListener("orientationchange", ()=>setTimeout(placeInfoChip,0));
 
 	setChatBusy(false);
+	restoreChatSession();
 }
 setupChat();

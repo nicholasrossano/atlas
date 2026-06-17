@@ -24,3 +24,12 @@ Future plans include:
 If you have books you'd like to add, please use this [Google Form](https://forms.gle/2EAUz7nf3pGPdM8z7) to submit new books.
 
 PRs and suggestions are also welcome! If you have feedback, ideas, or want to help, open an issue or submit a book via the form above.
+
+## Local development
+
+1. Copy `public/config.example.js` to `public/config.js` and fill in Firebase + MapTiler values.
+2. Serve `public/` with any static server, or use Firebase emulators.
+3. Cloud Function: `cd functions && pip install -r requirements.txt` then deploy or emulate `atlasChat`.
+4. Firestore rules: `firebase deploy --only firestore:rules` (map reads `atlasBooks` client-side; rules must allow public read).
+5. Audit missing map pins: `python functions/scripts/audit_country_override.py` (dry-run CSV report).
+6. Run function tests: `cd functions && python -m unittest test_atlas_chat.py`.
