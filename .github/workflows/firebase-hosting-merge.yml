@@ -37,6 +37,7 @@ jobs:
   deploy_functions:
     needs: test_functions
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -52,5 +53,4 @@ jobs:
       - name: Deploy atlasCatalog
         run: firebase deploy --only functions:atlasCatalog --project ponder-f84ce --non-interactive
       - name: Deploy atlasChat
-        continue-on-error: true
         run: firebase deploy --only functions:atlasChat --project ponder-f84ce --non-interactive

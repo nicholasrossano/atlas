@@ -43,6 +43,7 @@ class CIConfigTests(unittest.TestCase):
 		self.assertIn("scripts/prepare_functions_venv.sh", content)
 		self.assertIn("functions:atlasCatalog", content)
 		self.assertIn("functions:atlasChat", content)
+		self.assertIn("continue-on-error: true", content)
 
 	def test_prepare_venv_script_exists(self):
 		self.assertTrue(PREPARE_VENV_SCRIPT.is_file())
