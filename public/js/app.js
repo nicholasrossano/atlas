@@ -53,6 +53,8 @@ const BORDER_COLOR = "#FFFFFD";
 
 const MIN_ZOOM = 1.3, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.3;
 const MIN_LAT = -60, MAX_LAT = 85;
+// Slightly inset from ±180 so MapLibre treats bounds as a range, not “no limit”.
+const MAP_MAX_BOUNDS = [[-179.9, MIN_LAT], [179.9, MAX_LAT]];
 const ZOOM_LABEL_SWITCH = 2.0;
 
 const SELECT_ZOOM = 2.5;
@@ -109,6 +111,7 @@ const map = new maplibregl.Map({
 	zoom: INITIAL_ZOOM,
 	minZoom: MIN_ZOOM,
 	maxZoom: MAX_ZOOM,
+	maxBounds: MAP_MAX_BOUNDS,
 	renderWorldCopies: false,
 	preserveDrawingBuffer: true,
 	pitchWithRotate: false,
@@ -132,8 +135,25 @@ function clampLatNow(){
 	const clampedLat = Math.max(MIN_LAT, Math.min(MAX_LAT, c.lat));
 	if (clampedLat !== c.lat) map.setCenter([c.lng, clampedLat]);
 }
-map.on("drag", clampLatNow);
-map.on("zoom", clampLatNow);
+
+function clampLngNow(){
+	const bounds = map.getBounds();
+	if (!bounds) return;
+	const pad = 0.05;
+	let dLng = 0;
+	if (bounds.getEast() > MAP_MAX_BOUNDS[1][0] - pad) dLng = (MAP_MAX_BOUNDS[1][0] - pad) - bounds.getEast();
+	else if (bounds.getWest() < MAP_MAX_BOUNDS[0][0] + pad) dLng = (MAP_MAX_BOUNDS[0][0] + pad) - bounds.getWest();
+	if (!dLng) return;
+	const c = map.getCenter();
+	map.setCenter([c.lng + dLng, c.lat]);
+}
+
+function clampCenterNow(){
+	clampLatNow();
+	clampLngNow();
+}
+map.on("drag", clampCenterNow);
+map.on("zoom", clampCenterNow);
 
 const hardResize = () => { try { map.resize(); } catch(_){} };
 ["load","resize"].forEach(evt => window.addEventListener(evt, () => requestAnimationFrame(hardResize)));
