@@ -51,11 +51,12 @@ const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
 const BORDER_COLOR = "#FFFFFD";
 
-const MIN_ZOOM = 2.1, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 2.1;
-const MIN_LAT = -55, MAX_LAT = 80;
-// Inset from ±180 so MapLibre treats bounds as a range. Span must exceed min-zoom viewport width.
-const MAP_MAX_BOUNDS = [[-168, MIN_LAT], [178, MAX_LAT]];
-let mapPanBounds = MAP_MAX_BOUNDS;
+const MIN_ZOOM = 1.3, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.3;
+const MIN_LAT = -60, MAX_LAT = 85;
+// Slightly inset from ±180 so MapLibre treats bounds as a range, not “no limit”.
+const MAP_MAX_BOUNDS = [[-179.9, MIN_LAT], [179.9, MAX_LAT]];
+const MIN_LNG = MAP_MAX_BOUNDS[0][0];
+const MAX_LNG = MAP_MAX_BOUNDS[1][0];
 const ZOOM_LABEL_SWITCH = 2.0;
 
 const SELECT_ZOOM = 2.5;
@@ -131,43 +132,41 @@ map.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-ri
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 map.on("error", (e) => show("Map error:", e && e.error ? e.error.message : e));
 
-function enforceMapBounds(){
-	const viewport = map.getBounds();
-	if (!viewport || !mapPanBounds) return;
+function clampLatNow(){
+	const c = map.getCenter();
+	const clampedLat = Math.max(MIN_LAT, Math.min(MAX_LAT, c.lat));
+	if (clampedLat !== c.lat) map.setCenter([c.lng, clampedLat]);
+}
 
-	const [[minLng, minLat], [maxLng, maxLat]] = mapPanBounds;
+function enforceLngBounds(){
+	const viewport = map.getBounds();
+	if (!viewport) return;
+
 	const west = viewport.getWest();
 	const east = viewport.getEast();
-	const south = viewport.getSouth();
-	const north = viewport.getNorth();
 	const lngSpan = east - west;
-	const latSpan = north - south;
-	const maxLngSpan = maxLng - minLng;
-	const maxLatSpan = maxLat - minLat;
+	const maxLngSpan = MAX_LNG - MIN_LNG;
 	const center = map.getCenter();
 
 	if (lngSpan >= maxLngSpan) {
-		const lng = (minLng + maxLng) / 2;
+		const lng = (MIN_LNG + MAX_LNG) / 2;
 		if (Math.abs(center.lng - lng) > 1e-6) map.setCenter([lng, center.lat]);
-		return;
-	}
-	if (latSpan >= maxLatSpan) {
-		const lat = (minLat + maxLat) / 2;
-		if (Math.abs(center.lat - lat) > 1e-6) map.setCenter([center.lng, lat]);
 		return;
 	}
 
 	let dLng = 0;
-	let dLat = 0;
-	if (east > maxLng) dLng = maxLng - east;
-	else if (west < minLng) dLng = minLng - west;
-	if (north > maxLat) dLat = maxLat - north;
-	else if (south < minLat) dLat = minLat - south;
-	if (!dLng && !dLat) return;
-	map.setCenter([center.lng + dLng, center.lat + dLat]);
+	if (east > MAX_LNG) dLng = MAX_LNG - east;
+	else if (west < MIN_LNG) dLng = MIN_LNG - west;
+	if (!dLng) return;
+	map.setCenter([center.lng + dLng, center.lat]);
 }
 
-["move", "moveend", "drag", "zoom"].forEach(evt => map.on(evt, enforceMapBounds));
+function clampMapPan(){
+	enforceLngBounds();
+	clampLatNow();
+}
+
+["move", "moveend", "drag", "zoom"].forEach(evt => map.on(evt, clampMapPan));
 
 const hardResize = () => { try { map.resize(); } catch(_){} };
 ["load","resize"].forEach(evt => window.addEventListener(evt, () => requestAnimationFrame(hardResize)));
