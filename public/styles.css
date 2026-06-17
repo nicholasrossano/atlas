@@ -1406,14 +1406,12 @@ body.atlas-view-list .atlas-list-view {
 	overflow: hidden;
 	background: var(--atlas-panel-sub-bg);
 	border: var(--atlas-panel-sub-border);
-	box-shadow: var(--atlas-shadow);
-	transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+	transition: border-color 160ms ease, background 160ms ease;
 	flex-shrink: 0;
 }
 .atlas-list-book-row.is-expanded {
 	background: var(--atlas-panel-bg);
 	border: var(--atlas-panel-border);
-	box-shadow: var(--atlas-shadow);
 }
 
 .atlas-list-view .atlas-book {
