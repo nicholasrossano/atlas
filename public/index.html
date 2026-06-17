@@ -10,18 +10,11 @@
 		/>
 		<title>Ponder AI | Atlas of Queer Literature</title>
 		<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
-		<link rel="stylesheet" href="/styles.css" />
+		<link rel="stylesheet" href="/styles.css?v=39" />
 		<script src="/config.js"></script>
-		<script type="module">
-			import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-			const firebaseConfig = window.ATLAS_CONFIG?.firebase || null;
-			if (!firebaseConfig) {
-				console.warn("[atlas] Missing firebase config: set window.ATLAS_CONFIG.firebase in /config.js");
-			} else {
-				initializeApp(firebaseConfig);
-				window.FIREBASE_ATLAS_CONFIG = firebaseConfig;
-			}
-			window.ATLAS_CHAT_ENDPOINT = window.ATLAS_CONFIG?.atlas?.chatEndpoint || "";
+		<script>
+			window.ATLAS_CHAT_ENDPOINT = (window.ATLAS_CONFIG && window.ATLAS_CONFIG.atlas && window.ATLAS_CONFIG.atlas.chatEndpoint) || "";
+			window.ATLAS_CATALOG_ENDPOINT = (window.ATLAS_CONFIG && window.ATLAS_CONFIG.atlas && window.ATLAS_CONFIG.atlas.catalogEndpoint) || (window.ATLAS_CHAT_ENDPOINT ? window.ATLAS_CHAT_ENDPOINT.replace(/\/atlasChat\/?$/i, "/atlasCatalog") : "") || "/api/atlas/books";
 			window.ATLAS_CHAT_DEBUG = new URLSearchParams(window.location.search).get("atlasChatDebug") === "1";
 		</script>
 	</head>
@@ -42,13 +35,16 @@
 
 		<div class="atlas-top-right-tools">
 			<div id="atlas-view-controls" class="atlas-view-controls">
-				<button type="button" id="atlas-filter-toggle" class="atlas-filter-toggle" aria-expanded="false" aria-controls="atlas-filter-panel">
-					<svg class="atlas-filter-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
-						<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" fill="currentColor"></path>
-					</svg>
-					<span class="atlas-filter-toggle-label">Filter</span>
-					<span id="atlas-filter-badge" class="atlas-filter-badge" hidden aria-hidden="true"></span>
-				</button>
+				<div class="atlas-filter-controls" aria-hidden="true">
+					<button type="button" id="atlas-filter-toggle" class="atlas-filter-toggle" aria-expanded="false" aria-controls="atlas-filter-panel">
+						<svg class="atlas-filter-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z" fill="currentColor"></path>
+						</svg>
+						<span class="atlas-filter-toggle-label">Filter</span>
+						<span id="atlas-filter-badge" class="atlas-filter-badge" hidden aria-hidden="true"></span>
+					</button>
+					<span class="atlas-view-controls-divider" aria-hidden="true"></span>
+				</div>
 				<div class="atlas-view-toggle" role="group" aria-label="View mode">
 					<button type="button" id="atlas-view-map" class="atlas-view-toggle-btn is-active" aria-label="Map view" aria-pressed="true">
 						<svg class="atlas-view-toggle-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -70,7 +66,10 @@
 					</div>
 					<div class="atlas-filter-section">
 						<div class="atlas-filter-label">Country</div>
-						<div id="atlas-filter-countries" class="atlas-filter-countries" role="listbox" aria-label="Filter by country"></div>
+						<div class="atlas-filter-country-search">
+							<input type="search" id="atlas-filter-country-input" class="atlas-filter-country-input" placeholder="Search countries…" autocomplete="off" spellcheck="false" aria-controls="atlas-filter-country-results" aria-autocomplete="list" />
+							<div id="atlas-filter-country-results" class="atlas-filter-country-results" role="listbox" aria-label="Country suggestions" hidden></div>
+						</div>
 					</div>
 					<div class="atlas-filter-section">
 						<div class="atlas-filter-label">Tags</div>
@@ -80,7 +79,7 @@
 			</div>
 		</div>
 
-		<main id="atlas-list-view" class="atlas-list-view" hidden aria-label="Book catalog">
+		<main id="atlas-list-view" class="atlas-list-view" aria-label="Book catalog">
 			<div id="atlas-list-view-inner" class="atlas-list-view-inner"></div>
 		</main>
 
@@ -114,6 +113,6 @@
 		<div id="map" role="application" aria-label="World map highlighting countries on tap"></div>
 
 		<script src="/vendor/maplibre-gl.js"></script>
-		<script type="module" src="/js/app.js?v=atlas-v14"></script>
+		<script type="module" src="/js/app.js?v=atlas-v35"></script>
 	</body>
 </html>
