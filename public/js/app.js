@@ -33,8 +33,9 @@ const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
 const BORDER_COLOR = "#FEFCF6";
 
-const MIN_ZOOM = 1.5, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.5;
-const MIN_LAT = -60, MAX_LAT = 85;
+const MIN_ZOOM = 1.5, MAX_ZOOM = 5, INITIAL_CENTER = [0, 12], INITIAL_ZOOM = 1.5;
+const MIN_LAT = -56, MAX_LAT = 85;
+const WORLD_VIEW_BOUNDS = [[-180, -50], [180, 80]];
 const ZOOM_LABEL_SWITCH = 2.0;
 
 const SELECT_ZOOM = 2.5;
@@ -620,6 +621,17 @@ function updateOverlayCssVars(){
 function getMapOverlayPadding(){
 	updateOverlayCssVars();
 	return MAP_CAMERA_PADDING;
+}
+
+function fitWorldView(duration = 0){
+	const padding = getMapOverlayPadding();
+	map.fitBounds(WORLD_VIEW_BOUNDS, {
+		padding,
+		duration,
+		maxZoom: MIN_ZOOM,
+		minZoom: MIN_ZOOM,
+		linear: false
+	});
 }
 
 function isMobile(){ return window.matchMedia("(max-width: 520px)").matches; }
@@ -1284,6 +1296,9 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 			console.warn("[atlas] prewarm failed", e);
 		}
 	})();
+
+	map.setMaxBounds([[-180, MIN_LAT], [180, MAX_LAT]]);
+	fitWorldView(0);
 });
 
 // ─────────── Section Header ───────────
