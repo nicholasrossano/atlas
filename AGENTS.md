@@ -23,8 +23,8 @@ Every push to `main` runs **Deploy to Firebase Hosting on merge** with three job
 |--------|--------|-----|
 | `Failed to find location of Firebase Functions SDK` / `python3.14 -m venv` | `firebase-tools` default runtime (3.14) ≠ CI Python (3.12) | Keep `firebase.json` → `functions[].runtime` in sync with workflow `python-version` |
 | `Missing virtual environment at venv directory` | Deploy job skipped venv setup | Run `bash scripts/prepare_functions_venv.sh` before deploy |
-| `Missing permissions ... iam.serviceAccounts.ActAs` | GHA service account lacks roles | Grant **Service Account User** (`roles/iam.serviceAccountUser`) to the GitHub Actions deploy SA on `1070041172712-compute@developer.gserviceaccount.com` (and `ponder-f84ce@appspot.gserviceaccount.com` if needed). Merge CI runs `deploy_functions` with `continue-on-error` until IAM is fixed. |
-| `secretmanager.versions.get` denied on `OPENAI_API_KEY` | GHA deploy SA cannot read Secret Manager | Grant **Secret Manager Secret Accessor** (+ **Secret Manager Viewer**) to the GitHub Actions service account for `atlasChat` deploys |
+| `Missing permissions ... iam.serviceAccounts.ActAs` | GHA service account lacks roles | Grant **Service Account User** to `github-action-1130762004@ponder-f84ce.iam.gserviceaccount.com` on `1070041172712-compute@developer.gserviceaccount.com` |
+| `secretmanager.versions.get` denied on `OPENAI_API_KEY` | GHA deploy SA cannot read Secret Manager | Grant **Secret Manager Secret Accessor** on `OPENAI_API_KEY` to `github-action-1130762004@ponder-f84ce.iam.gserviceaccount.com` |
 | Unit tests fail importing Firestore | Eager `firestore.client()` at import | Keep lazy `_get_db()` pattern in `atlas_chat.py` |
 
 ### Required checks before merging CI/deploy changes

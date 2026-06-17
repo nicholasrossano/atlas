@@ -37,7 +37,6 @@ jobs:
   deploy_functions:
     needs: test_functions
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -50,7 +49,5 @@ jobs:
         run: npm install -g firebase-tools
       - name: Prepare function virtual environment
         run: bash scripts/prepare_functions_venv.sh
-      - name: Deploy atlasCatalog
-        run: firebase deploy --only functions:atlasCatalog --project ponder-f84ce --non-interactive
-      - name: Deploy atlasChat
-        run: firebase deploy --only functions:atlasChat --project ponder-f84ce --non-interactive
+      - name: Deploy Cloud Functions
+        run: firebase deploy --only functions:atlasCatalog,functions:atlasChat --project ponder-f84ce --non-interactive

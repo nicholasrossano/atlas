@@ -41,9 +41,7 @@ class CIConfigTests(unittest.TestCase):
 	def test_merge_workflow_prepares_functions_venv(self):
 		content = (ROOT / ".github/workflows/firebase-hosting-merge.yml").read_text()
 		self.assertIn("scripts/prepare_functions_venv.sh", content)
-		self.assertIn("functions:atlasCatalog", content)
-		self.assertIn("functions:atlasChat", content)
-		self.assertIn("continue-on-error: true", content)
+		self.assertIn("functions:atlasCatalog,functions:atlasChat", content)
 
 	def test_prepare_venv_script_exists(self):
 		self.assertTrue(PREPARE_VENV_SCRIPT.is_file())
