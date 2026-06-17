@@ -1,7 +1,7 @@
 // Atlas/public/js/app.js
 
 // ─────────── Section Header ───────────
-console.log("[atlas] app.js v43 booting");
+console.log("[atlas] app.js v44 booting");
 
 // ─────────── Section Header ───────────
 const atlasConfig = window.ATLAS_CONFIG || {};
@@ -1496,6 +1496,15 @@ function collapseChat(trigger, options){
 	requestAnimationFrame(placeInfoChip);
 }
 
+function collapseChatFromOutsideClick(trigger){
+	if (!chatRoot || !chatIsExpanded) return;
+	if (chatHasUserMessage){
+		collapseChat(trigger, { force: true, preserve: true });
+		return;
+	}
+	collapseChat(trigger);
+}
+
 function ensureIntroIfNeeded(trigger){
 	if (!chatIsExpanded) return;
 	if (chatIntroInjected) return;
@@ -2744,13 +2753,19 @@ function setupChat(){
 	}
 
 	document.addEventListener("mousedown", (event) => {
-		if (!chatRoot) return;
-		if (!chatIsExpanded) return;
-		if (chatHasUserMessage) return;
+		if (!chatRoot || !chatIsExpanded) return;
 		const target = event.target;
 		if (target && chatRoot.contains(target)) return;
-		collapseChat("click_away");
+		collapseChatFromOutsideClick("click_away");
 	});
+
+	const bindMapChatCollapse = () => {
+		if (map._atlasChatCollapseBound) return;
+		map._atlasChatCollapseBound = true;
+		map.on("mousedown", () => collapseChatFromOutsideClick("map_mousedown"));
+	};
+	if (map.loaded()) bindMapChatCollapse();
+	else map.once("load", bindMapChatCollapse);
 
 	window.addEventListener("resize", ()=>requestAnimationFrame(placeInfoChip));
 	window.addEventListener("orientationchange", ()=>setTimeout(placeInfoChip,0));

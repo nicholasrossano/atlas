@@ -850,17 +850,17 @@ body.atlas-chat-expanded .atlas-info {
 	background: transparent;
 	color: #301900;
 	cursor: pointer;
+	-webkit-tap-highlight-color: transparent;
 }
 
 .atlas-chat-send-icon{
 	width: 34px;
 	height: 34px;
 	display: block;
-	fill: currentColor;
 }
 
 .atlas-chat-send:disabled{
-	opacity: 0.5;
+	opacity: 0.45;
 	cursor: default;
 }
 

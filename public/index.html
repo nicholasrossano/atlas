@@ -125,8 +125,9 @@
 				<div class="atlas-chat-input-row" role="form" aria-label="Send a message">
 					<textarea id="atlas-chat-input" class="atlas-chat-input" rows="1" spellcheck="false" placeholder="Ask anything…"></textarea>
 					<button id="atlas-chat-send" class="atlas-chat-send" type="button" aria-label="Send message">
-						<svg class="atlas-chat-send-icon" viewBox="0 0 24 24" aria-hidden="true">
-							<path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 14.5V9.83L8.41 13.5 7 12.09l5-5 5 5-1.41 1.41L13 9.83V16.5H12z"></path>
+						<svg class="atlas-chat-send-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+							<circle class="atlas-chat-send-circle" cx="12" cy="12" r="10" fill="currentColor"></circle>
+							<path class="atlas-chat-send-arrow" d="M12 16V8.5M8.75 11.75L12 8.5l3.25 3.25" stroke="#fff" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path>
 						</svg>
 					</button>
 				</div>
@@ -137,6 +138,6 @@
 		<div id="map" role="application" aria-label="World map highlighting countries on tap"></div>
 
 		<script src="/vendor/maplibre-gl.js"></script>
-		<script type="module" src="/js/app.js?v=atlas-v43"></script>
+		<script type="module" src="/js/app.js?v=atlas-v44"></script>
 	</body>
 </html>
