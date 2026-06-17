@@ -70,25 +70,6 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 .atlas-home:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
 .atlas-home-icon { width: 20px; height: 20px; display: block; }
 
-.atlas-map-reset {
-	pointer-events: auto;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 26px; height: 26px;
-	color: #111;
-	border: 0;
-	border-radius: 8px;
-	background: transparent;
-	cursor: pointer;
-	-webkit-tap-highlight-color: transparent;
-	transition: background 120ms ease, opacity 120ms ease;
-	opacity: .95;
-}
-.atlas-map-reset:hover { background: rgba(0,0,0,0.06); opacity: 1; }
-.atlas-map-reset:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
-.atlas-map-reset-icon { width: 18px; height: 18px; display: block; fill: currentColor; }
-
 .atlas-head {
 	display: flex;
 	flex-direction: column;
@@ -112,14 +93,29 @@ html, body { margin: 0; height: 100%; background: #faf7ef; }
 	font-size: 13px; font-weight: 600; letter-spacing: 0.2px;
 }
 
-/* MapLibre controls sit above chat / safe areas */
+/* MapLibre: attribution at the bottom-right corner; zoom stacked just above it */
 .maplibregl-ctrl-bottom-right {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 8px;
 	margin-right: calc(8px + env(safe-area-inset-right)) !important;
-	margin-bottom: calc(var(--atlas-chat-h, 56px) + 28px + env(safe-area-inset-bottom)) !important;
+	margin-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
+}
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl {
+	float: none;
+	margin: 0 !important;
+}
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-group {
+	order: 1;
+}
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib {
+	order: 2;
+	max-width: min(72vw, 360px);
 }
 .maplibregl-ctrl-bottom-left {
 	margin-left: calc(8px + env(safe-area-inset-left)) !important;
-	margin-bottom: calc(18px + env(safe-area-inset-bottom)) !important;
+	margin-bottom: calc(8px + env(safe-area-inset-bottom)) !important;
 }
 
 /* ─────────── Country chip (widget) ─────────── */
@@ -859,7 +855,7 @@ body.atlas-chat-expanded .atlas-info {
 	position: fixed;
 	top: calc(16px + env(safe-area-inset-top));
 	right: calc(16px + env(safe-area-inset-right));
-	z-index: 1210;
+	z-index: 1320;
 	display: flex;
 	flex-direction: column;
 	align-items: flex-end;
@@ -1135,9 +1131,6 @@ body.atlas-chat-expanded .atlas-info {
 body.atlas-view-list #map {
 	visibility: hidden;
 	pointer-events: none;
-}
-body.atlas-view-list .atlas-map-reset {
-	display: none;
 }
 body.atlas-view-list .atlas-info {
 	display: none !important;

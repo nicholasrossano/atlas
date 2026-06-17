@@ -79,7 +79,7 @@ const map = new maplibregl.Map({
 	pitchWithRotate: false,
 	dragRotate: false,
 	touchPitch: false,
-	attributionControl: true,
+	attributionControl: false,
 	transformRequest: (url) => url.startsWith(API_ROOT) ? ({ url: ensureKey(url) }) : ({ url })
 });
 
@@ -87,6 +87,7 @@ map.touchZoomRotate.enable(); map.touchZoomRotate.disableRotation();
 map.scrollZoom.enable();
 map.boxZoom.disable(); map.doubleClickZoom.disable();
 
+map.addControl(new maplibregl.AttributionControl({ compact: false }), "bottom-right");
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
 function clampLatNow(){
@@ -124,7 +125,8 @@ const booksList = document.getElementById("atlas-books");
 const emptyMsg  = document.getElementById("atlas-empty");
 const chatShell = document.querySelector(".atlas-chat-shell");
 const atlasHeader = document.querySelector(".atlas-header");
-const mapResetButton = document.getElementById("atlas-map-reset");
+
+const MAP_CAMERA_PADDING = { top: 90, right: 90, bottom: 100, left: 90 };
 
 // ─────────── Section Header ───────────
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
@@ -170,7 +172,6 @@ let _db = null;
 const BOOKS_COLLECTION = "atlasBooks";
 let _allBooksPromise = null;
 const _booksByIsoCache = new Map();
-let _availableIsoList = [];
 
 async function ensureFirestore(){
 	if (_db) return _db;
@@ -410,32 +411,12 @@ async function loadAllBooks(db){
 }
 
 // ─────────── Section Header ───────────
-function computeAvailableIsoList(records){
-	const out = new Set();
-	for (const rec of records){
-		for (const t of (rec.iso2Sets?.any || [])){
-			if (t && typeof t === "string" && t.length === 2) out.add(t.toUpperCase());
-		}
-	}
-	const arr = Array.from(out).filter(iso => iso !== "AQ").sort();
-	return arr;
-}
-
-// ─────────── Section Header ───────────
-function availabilityPaintExpr(list){
+function countryFillPaintExpr(){
 	return [
 		"case",
 		["==", ["get","iso_a2"], "AQ"], "rgba(0,0,0,0)",
-		["in", ["get","iso_a2"], ["literal", list]], HIGHLIGHT_COLOR,
-		BLUSH_COLOR
+		HIGHLIGHT_COLOR
 	];
-}
-
-function updateAvailabilityStyle(){
-	if (!map.getLayer(AVAIL_LAYER_ID)) return;
-	try {
-		map.setPaintProperty(AVAIL_LAYER_ID, "fill-color", availabilityPaintExpr(_availableIsoList));
-	} catch(_) {}
 }
 
 // ─────────── Section Header ───────────
@@ -517,12 +498,9 @@ function renderBooks(items, iso, options = {}){
 	console.log("[atlas] rendered", items.length, "book(s) for", iso);
 }
 
-function showBookDetail(book, iso){
-	if (!booksList || !emptyMsg || !book) return;
+const BOOK_TAG_COLORS = ["#8D1717", "#711248", "#BD6217", "#0E5555", "#8285B6", "#127112", "#5F8415"];
 
-	selectedBook = book;
-	if (infoBox) infoBox.classList.add("is-book-detail");
-
+function buildBookDetailHtml(book){
 	const title = String(book.title || "").trim() || "Untitled";
 	const author = String(book.author || "").trim() || "Unknown";
 	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
@@ -532,7 +510,6 @@ function showBookDetail(book, iso){
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
 	const hasBuy = rawBuyUrl.length > 0;
 	const isEditorRead = book.read === true;
-	const tagColors = ["#8D1717", "#711248", "#BD6217", "#0E5555", "#8285B6", "#127112", "#5F8415"];
 	const tags = Array.isArray(book.tags) ? book.tags : [];
 
 	let buyButtonHtml = "";
@@ -556,15 +533,15 @@ function showBookDetail(book, iso){
 
 	let tagsHtml = "";
 	if (tags.length){
-		const pills = tags.slice(0, tagColors.length).map((tag, idx) => {
+		const pills = tags.slice(0, BOOK_TAG_COLORS.length).map((tag, idx) => {
 			const text = String(tag || "").trim();
 			if (!text) return "";
-			return `<span class="atlas-book-tag" style="--tag-color:${tagColors[idx]};">${escapeHtml(text)}</span>`;
+			return `<span class="atlas-book-tag" style="--tag-color:${BOOK_TAG_COLORS[idx]};">${escapeHtml(text)}</span>`;
 		}).filter(Boolean).join("");
 		if (pills) tagsHtml = `<div class="atlas-book-tags">${pills}</div>`;
 	}
 
-	const html = `
+	return `
   <div class="atlas-book-detail">
   <div class="atlas-book-detail-header">
    <div class="atlas-book-detail-toprow">
@@ -586,22 +563,32 @@ function showBookDetail(book, iso){
   ${summaryHtml}
   </div>
   `;
+}
 
-	booksList.innerHTML = html;
+function mountBookDetail(container, book, onBack){
+	if (!container || !book) return;
+	container.innerHTML = buildBookDetailHtml(book);
+	attachCoverFallbacks(container);
+	const backButton = container.querySelector(".atlas-book-back");
+	if (backButton && typeof onBack === "function"){
+		backButton.addEventListener("click", onBack);
+	}
+}
+
+function showBookDetail(book, iso){
+	if (!booksList || !emptyMsg || !book) return;
+
+	selectedBook = book;
+	if (infoBox) infoBox.classList.add("is-book-detail");
+
+	mountBookDetail(booksList, book, () => {
+		if (infoBox) infoBox.classList.remove("is-book-detail");
+		renderBooks(lastBooksItems, lastBooksIso);
+		requestAnimationFrame(placeInfoChip);
+	});
+
 	booksList.hidden = false;
 	emptyMsg.hidden = true;
-
-	attachCoverFallbacks(booksList);
-
-	const backButton = booksList.querySelector(".atlas-book-back");
-	if (backButton){
-		backButton.addEventListener("click", () => {
-			if (infoBox) infoBox.classList.remove("is-book-detail");
-			renderBooks(lastBooksItems, lastBooksIso);
-			requestAnimationFrame(placeInfoChip);
-		});
-	}
-
 	requestAnimationFrame(placeInfoChip);
 }
 
@@ -622,20 +609,17 @@ if (booksList) {
 }
 
 // ─────────── Section Header ───────────
-function getMapOverlayPadding(){
-	const headerH = atlasHeader ? Math.ceil(atlasHeader.getBoundingClientRect().height) + 20 : 90;
-	let bottom = 100;
-	if (chatShell){
-		bottom = Math.ceil(chatShell.getBoundingClientRect().height) + 24;
-	}
-	if (infoBox && infoBox.classList.contains("is-visible") && !document.body.classList.contains("atlas-chat-expanded")){
-		bottom += Math.ceil(infoBox.getBoundingClientRect().height) + 12;
-	}
+function updateOverlayCssVars(){
+	const headerH = atlasHeader ? Math.ceil(atlasHeader.getBoundingClientRect().height) + 20 : 72;
 	document.documentElement.style.setProperty("--atlas-overlays-top", `${headerH}px`);
 	if (chatShell){
 		document.documentElement.style.setProperty("--atlas-chat-h", `${Math.ceil(chatShell.getBoundingClientRect().height)}px`);
 	}
-	return { top: headerH, right: 90, bottom, left: 90 };
+}
+
+function getMapOverlayPadding(){
+	updateOverlayCssVars();
+	return MAP_CAMERA_PADDING;
 }
 
 function isMobile(){ return window.matchMedia("(max-width: 520px)").matches; }
@@ -1215,7 +1199,7 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 	map.addLayer({ id:AVAIL_LAYER_ID, type:"fill",
 		source:SOURCE_ID, "source-layer":SOURCE_LAYER,
 		paint:{
-			"fill-color": availabilityPaintExpr(_availableIsoList),
+			"fill-color": countryFillPaintExpr(),
 			"fill-opacity": AVAIL_OPACITY,
 			"fill-outline-color": BORDER_COLOR,
 			"fill-color-transition": layerFadeTransition(),
@@ -1295,27 +1279,12 @@ map.on("load",()=>{ show("Map load OK"); hardResize();
 		try {
 			const db = await ensureFirestore(); if (!db) return;
 			const records = await loadAllBooks(db);
-			_availableIsoList = computeAvailableIsoList(records);
-			updateAvailabilityStyle();
-			console.log("[atlas] availability countries:", _availableIsoList.length);
+			console.log("[atlas] prewarmed", records.length, "book(s)");
 		} catch(e){
 			console.warn("[atlas] prewarm failed", e);
 		}
 	})();
 });
-
-function resetMapView(){
-	resetSelection();
-	map.easeTo({
-		center: INITIAL_CENTER,
-		zoom: INITIAL_ZOOM,
-		duration: SELECT_DURATION_MS
-	});
-}
-
-if (mapResetButton){
-	mapResetButton.addEventListener("click", () => resetMapView());
-}
 
 // ─────────── Section Header ───────────
 const chatThread = document.getElementById("atlas-chat-thread");
@@ -1958,6 +1927,349 @@ async function submitChat(rawText, trigger){
 		setChatBusy(false);
 	}
 }
+
+// ─────────── List view + filters ───────────
+const VIEW_MODE_STORAGE_KEY = "atlas_view_mode_v1";
+const listViewRoot = document.getElementById("atlas-list-view");
+const listViewInner = document.getElementById("atlas-list-view-inner");
+const filterToggleBtn = document.getElementById("atlas-filter-toggle");
+const filterPanel = document.getElementById("atlas-filter-panel");
+const filterBadge = document.getElementById("atlas-filter-badge");
+const filterClearBtn = document.getElementById("atlas-filter-clear");
+const filterCountriesEl = document.getElementById("atlas-filter-countries");
+const filterTagsEl = document.getElementById("atlas-filter-tags");
+const viewMapBtn = document.getElementById("atlas-view-map");
+const viewListBtn = document.getElementById("atlas-view-list");
+const topRightTools = document.querySelector(".atlas-top-right-tools");
+
+let viewMode = "map";
+let filterPanelOpen = false;
+let listFilterCountry = null;
+const listFilterTags = new Set();
+let listSections = [];
+let listViewLoading = false;
+
+function computeOverrideIsoList(records){
+	const out = new Set();
+	for (const rec of records){
+		for (const iso of (rec.iso2Sets?.override || [])){
+			if (iso && typeof iso === "string" && iso.length === 2 && iso !== "AQ") out.add(iso.toUpperCase());
+		}
+	}
+	return Array.from(out).sort();
+}
+
+function computeAllTags(records){
+	const out = new Set();
+	for (const rec of records){
+		for (const tag of (rec.tags || [])){
+			const trimmed = String(tag || "").trim();
+			if (trimmed) out.add(trimmed);
+		}
+	}
+	return Array.from(out).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function applyListFilters(records, { countryIso, tags }){
+	const country = countryIso ? String(countryIso).toUpperCase() : null;
+	const tagList = Array.isArray(tags) ? tags.filter(Boolean) : [];
+	const tagSet = tagList.length ? new Set(tagList.map(t => String(t).toLowerCase())) : null;
+
+	return records.filter(rec => {
+		const overrides = rec.iso2Sets?.override || [];
+		if (country && !overrides.includes(country)) return false;
+		if (tagSet){
+			const bookTags = (rec.tags || []).map(t => String(t).toLowerCase());
+			if (!bookTags.some(t => tagSet.has(t))) return false;
+		}
+		return overrides.length > 0;
+	});
+}
+
+function groupBooksByCountry(records){
+	const groups = new Map();
+	for (const rec of records){
+		for (const iso of (rec.iso2Sets?.override || [])){
+			if (!iso || iso === "AQ") continue;
+			const key = iso.toUpperCase();
+			if (!groups.has(key)){
+				groups.set(key, { iso: key, name: fullCountryName(key), books: [] });
+			}
+			groups.get(key).books.push(rec);
+		}
+	}
+	const sections = Array.from(groups.values());
+	for (const section of sections){
+		section.books.sort((a, b) => String(a.title || "").localeCompare(String(b.title || "")));
+	}
+	sections.sort((a, b) => a.name.localeCompare(b.name));
+	return sections;
+}
+
+function hasActiveListFilters(){
+	return !!(listFilterCountry || listFilterTags.size);
+}
+
+function updateFilterBadge(){
+	if (!filterBadge) return;
+	const active = hasActiveListFilters();
+	filterBadge.hidden = !active;
+}
+
+function renderFilterOptions(records){
+	if (!filterCountriesEl || !filterTagsEl) return;
+
+	const countries = computeOverrideIsoList(records);
+	filterCountriesEl.innerHTML = countries.map(iso => {
+		const selected = listFilterCountry === iso;
+		return `<button type="button" class="atlas-filter-country${selected ? " is-selected" : ""}" data-iso="${escapeHtml(iso)}" role="option" aria-selected="${selected}">
+			<span class="atlas-filter-country-flag">${isoToFlagEmoji(iso)}</span>
+			<span>${escapeHtml(fullCountryName(iso))}</span>
+		</button>`;
+	}).join("");
+
+	const tags = computeAllTags(records);
+	filterTagsEl.innerHTML = tags.map((tag, idx) => {
+		const selected = listFilterTags.has(tag);
+		const color = BOOK_TAG_COLORS[idx % BOOK_TAG_COLORS.length];
+		return `<button type="button" class="atlas-filter-chip${selected ? " is-selected" : ""}" data-tag="${escapeHtml(tag)}" style="--tag-color:${color};">${escapeHtml(tag)}</button>`;
+	}).join("");
+
+	updateFilterBadge();
+}
+
+function renderListSectionHeader(section){
+	const count = section.books.length;
+	const label = count === 1 ? "1 book" : `${count} books`;
+	return `
+		<header class="atlas-list-section-header">
+			<span class="atlas-flag" role="img" aria-label="Country flag">${isoToFlagEmoji(section.iso)}</span>
+			<span class="atlas-name">${escapeHtml(section.name)}</span>
+			<span class="atlas-book-count">· ${label}</span>
+		</header>
+	`;
+}
+
+async function renderListView(){
+	if (!listViewInner) return;
+
+	listViewInner.innerHTML = buildLoadingSkeleton();
+	listViewLoading = true;
+
+	try {
+		const db = await ensureFirestore();
+		if (!db){
+			listViewInner.innerHTML = `<div class="atlas-list-empty">${escapeHtml(EMPTY_LOAD_ERROR_MSG)}</div>`;
+			return;
+		}
+
+		const records = await loadAllBooks(db);
+		renderFilterOptions(records);
+
+		const filtered = applyListFilters(records, {
+			countryIso: listFilterCountry,
+			tags: Array.from(listFilterTags)
+		});
+		listSections = groupBooksByCountry(filtered);
+
+		if (!listSections.length){
+			const msg = hasActiveListFilters()
+				? "No books match these filters."
+				: "No books are pinned to any country yet.";
+			listViewInner.innerHTML = `<div class="atlas-list-empty">${escapeHtml(msg)}</div>`;
+			return;
+		}
+
+		const html = listSections.map(section => {
+			const rows = section.books.map((book, idx) => renderBookListRow(book, idx)).join("");
+			return `<section class="atlas-list-section" data-iso="${escapeHtml(section.iso)}">
+				${renderListSectionHeader(section)}
+				<div class="atlas-list-section-books">${rows}</div>
+			</section>`;
+		}).join("");
+
+		listViewInner.innerHTML = html;
+		attachCoverFallbacks(listViewInner);
+	} catch (err) {
+		console.error("[atlas] list view render failed:", err);
+		listViewInner.innerHTML = `<div class="atlas-list-empty">${escapeHtml(EMPTY_LOAD_ERROR_MSG)}</div>`;
+	} finally {
+		listViewLoading = false;
+	}
+}
+
+function showListBookDetail(book, iso, sectionBooks){
+	if (!listViewInner || !book) return;
+	lastBooksIso = iso;
+	lastBooksItems = Array.isArray(sectionBooks) ? sectionBooks.slice() : [];
+	selectedBook = book;
+	listViewInner.classList.add("is-detail");
+	mountBookDetail(listViewInner, book, () => {
+		listViewInner.classList.remove("is-detail");
+		renderListView();
+	});
+	if (listViewRoot) listViewRoot.scrollTop = 0;
+}
+
+function handleListViewClick(event){
+	const itemEl = event.target.closest(".atlas-book");
+	if (!itemEl || !listViewInner) return;
+	const sectionEl = itemEl.closest(".atlas-list-section");
+	if (!sectionEl) return;
+	const iso = sectionEl.getAttribute("data-iso");
+	const section = listSections.find(s => s.iso === iso);
+	if (!section) return;
+	const idx = Number(itemEl.getAttribute("data-idx"));
+	if (!Number.isFinite(idx)) return;
+	const book = section.books[idx];
+	if (!book) return;
+	showListBookDetail(book, iso, section.books);
+}
+
+function setViewMode(mode){
+	const next = mode === "list" ? "list" : "map";
+	if (viewMode === next) return;
+	viewMode = next;
+
+	if (viewMode === "list"){
+		resetSelection();
+		hideInfo();
+		document.body.classList.add("atlas-view-list");
+		if (listViewRoot) listViewRoot.hidden = false;
+		renderListView();
+	} else {
+		document.body.classList.remove("atlas-view-list");
+		if (listViewRoot) listViewRoot.hidden = true;
+		if (listViewInner) listViewInner.classList.remove("is-detail");
+	}
+
+	if (viewMapBtn){
+		viewMapBtn.classList.toggle("is-active", viewMode === "map");
+		viewMapBtn.setAttribute("aria-pressed", viewMode === "map" ? "true" : "false");
+	}
+	if (viewListBtn){
+		viewListBtn.classList.toggle("is-active", viewMode === "list");
+		viewListBtn.setAttribute("aria-pressed", viewMode === "list" ? "true" : "false");
+	}
+
+	try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode); } catch {}
+	requestAnimationFrame(() => {
+		getMapOverlayPadding();
+		if (viewMode === "map") hardResize();
+	});
+}
+
+function toggleFilterPanel(open){
+	const wantOpen = typeof open === "boolean" ? open : !filterPanelOpen;
+	filterPanelOpen = wantOpen;
+	if (filterPanel){
+		filterPanel.classList.toggle("is-expanded", wantOpen);
+		filterPanel.classList.toggle("is-collapsed", !wantOpen);
+		filterPanel.setAttribute("aria-hidden", wantOpen ? "false" : "true");
+	}
+	if (filterToggleBtn){
+		filterToggleBtn.setAttribute("aria-expanded", wantOpen ? "true" : "false");
+	}
+}
+
+function clearListFilters(){
+	listFilterCountry = null;
+	listFilterTags.clear();
+	updateFilterBadge();
+	if (filterCountriesEl){
+		filterCountriesEl.querySelectorAll(".atlas-filter-country.is-selected").forEach(el => el.classList.remove("is-selected"));
+	}
+	if (filterTagsEl){
+		filterTagsEl.querySelectorAll(".atlas-filter-chip.is-selected").forEach(el => el.classList.remove("is-selected"));
+	}
+	if (viewMode === "list") renderListView();
+	else ensureFirestore().then(db => db && loadAllBooks(db).then(renderFilterOptions)).catch(() => {});
+}
+
+function setupListView(){
+	if (!listViewRoot || !viewMapBtn || !viewListBtn) return;
+
+	try {
+		const saved = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+		if (saved === "list") setViewMode("list");
+	} catch {}
+
+	viewMapBtn.addEventListener("click", () => {
+		toggleFilterPanel(false);
+		setViewMode("map");
+	});
+	viewListBtn.addEventListener("click", () => setViewMode("list"));
+
+	if (filterToggleBtn){
+		filterToggleBtn.addEventListener("click", (event) => {
+			event.stopPropagation();
+			toggleFilterPanel();
+		});
+	}
+
+	if (filterClearBtn){
+		filterClearBtn.addEventListener("click", () => clearListFilters());
+	}
+
+	if (filterCountriesEl){
+		filterCountriesEl.addEventListener("click", (event) => {
+			const btn = event.target.closest(".atlas-filter-country");
+			if (!btn) return;
+			const iso = btn.getAttribute("data-iso");
+			if (!iso) return;
+			if (listFilterCountry === iso){
+				listFilterCountry = null;
+				btn.classList.remove("is-selected");
+				btn.setAttribute("aria-selected", "false");
+			} else {
+				listFilterCountry = iso;
+				filterCountriesEl.querySelectorAll(".atlas-filter-country").forEach(el => {
+					const selected = el.getAttribute("data-iso") === iso;
+					el.classList.toggle("is-selected", selected);
+					el.setAttribute("aria-selected", selected ? "true" : "false");
+				});
+			}
+			updateFilterBadge();
+			if (viewMode === "list") renderListView();
+		});
+	}
+
+	if (filterTagsEl){
+		filterTagsEl.addEventListener("click", (event) => {
+			const btn = event.target.closest(".atlas-filter-chip");
+			if (!btn) return;
+			const tag = btn.getAttribute("data-tag");
+			if (!tag) return;
+			if (listFilterTags.has(tag)){
+				listFilterTags.delete(tag);
+				btn.classList.remove("is-selected");
+			} else {
+				listFilterTags.add(tag);
+				btn.classList.add("is-selected");
+			}
+			updateFilterBadge();
+			if (viewMode === "list") renderListView();
+		});
+	}
+
+	if (listViewInner){
+		listViewInner.addEventListener("click", handleListViewClick);
+	}
+
+	document.addEventListener("mousedown", (event) => {
+		if (!filterPanelOpen) return;
+		const target = event.target;
+		if (topRightTools && topRightTools.contains(target)) return;
+		toggleFilterPanel(false);
+	});
+
+	ensureFirestore().then(db => {
+		if (!db) return;
+		return loadAllBooks(db).then(renderFilterOptions);
+	}).catch(err => console.warn("[atlas] filter options prewarm failed", err));
+}
+
+setupListView();
 
 function setupChat(){
 	if (!chatInput || !chatSendButton) return;

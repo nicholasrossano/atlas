@@ -28,7 +28,7 @@ logger.setLevel(logging.INFO)
 ATLAS_CHAT_MODEL = os.environ.get("ATLAS_CHAT_MODEL") or "gpt-4o-mini"
 ATLAS_CHAT_CACHE_TTL_SEC = int(os.environ.get("ATLAS_CHAT_CACHE_TTL_SEC") or 600)
 ATLAS_CHAT_DEBUG = (os.environ.get("ATLAS_CHAT_DEBUG") or "").strip() == "1"
-ATLAS_CHAT_BUILD = os.environ.get("ATLAS_CHAT_BUILD") or "atlas_chat_2026_01_06e"
+ATLAS_CHAT_BUILD = os.environ.get("ATLAS_CHAT_BUILD") or "atlas_chat_2026_06_17b"
 
 _ATLAS_BOOK_CACHE_TS = 0.0
 _ATLAS_BOOK_CACHE: List[Dict[str, Any]] = []
@@ -315,19 +315,153 @@ def _parse_output_text_json(resp_json: Dict[str, Any]) -> Dict[str, Any]:
 # ─────────── Tiered candidate ranking (no exclusion) ───────────
 TIER1_DETAIL_COUNT = int(os.environ.get("ATLAS_CHAT_TIER1_COUNT") or 50)
 
+_QUERY_STOPWORDS = frozenset({
+	"a", "an", "and", "any", "are", "book", "books", "for", "from", "in", "me", "my",
+	"of", "or", "recommend", "recommendation", "recommendations", "some", "the", "to", "with",
+})
+
+_THEME_EXPANSIONS: Dict[str, List[str]] = {
+	"queer": ["queer", "lgbtq", "lgbt", "lgbtqia", "gay", "lesbian", "bisexual", "trans", "transgender"],
+	"lgbt": ["lgbt", "lgbtq", "lgbtqia", "queer", "gay", "lesbian", "bisexual", "trans", "transgender"],
+	"lgbtq": ["lgbtq", "lgbt", "lgbtqia", "queer", "gay", "lesbian", "bisexual", "trans", "transgender"],
+}
+
+_REGION_KEYWORDS: Dict[str, frozenset] = {
+	"africa": frozenset({
+		"DZ", "AO", "BJ", "BW", "BF", "BI", "CV", "CM", "CF", "TD", "KM", "CG", "CD", "CI", "DJ", "EG",
+		"GQ", "ER", "SZ", "ET", "GA", "GM", "GH", "GN", "GW", "KE", "LS", "LR", "LY", "MG", "MW", "ML",
+		"MR", "MU", "MA", "MZ", "NA", "NE", "NG", "RW", "ST", "SN", "SC", "SL", "SO", "ZA", "SS", "SD",
+		"TZ", "TG", "TN", "UG", "ZM", "ZW",
+	}),
+	"asia": frozenset({
+		"AF", "AM", "AZ", "BH", "BD", "BT", "BN", "KH", "CN", "GE", "IN", "ID", "IR", "IQ", "IL", "JP",
+		"JO", "KZ", "KW", "KG", "LA", "LB", "MY", "MV", "MN", "MM", "NP", "KP", "OM", "PK", "PH", "QA",
+		"SA", "SG", "KR", "LK", "SY", "TW", "TJ", "TH", "TL", "TR", "TM", "AE", "UZ", "VN", "YE",
+	}),
+	"europe": frozenset({
+		"AL", "AD", "AT", "BY", "BE", "BA", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR",
+		"HU", "IS", "IE", "IT", "LV", "LI", "LT", "LU", "MT", "MD", "MC", "ME", "NL", "MK", "NO", "PL",
+		"PT", "RO", "RU", "SM", "RS", "SK", "SI", "ES", "SE", "CH", "UA", "GB", "VA",
+	}),
+	"south america": frozenset({"AR", "BO", "BR", "CL", "CO", "EC", "GY", "PY", "PE", "SR", "UY", "VE"}),
+	"north america": frozenset({"CA", "MX", "US", "GT", "HN", "SV", "NI", "CR", "PA", "BZ", "CU", "DO", "HT", "JM", "TT"}),
+	"oceania": frozenset({"AU", "FJ", "KI", "MH", "FM", "NR", "NZ", "PW", "PG", "WS", "SB", "TO", "TV", "VU"}),
+}
+
 
 def _tokenize_query(text: str) -> List[str]:
 	norm = _normalize_text(text)
-	return [t for t in norm.split(" ") if len(t) >= 2]
+	return [t for t in norm.split(" ") if len(t) >= 2 and t not in _QUERY_STOPWORDS]
 
 
-def _score_book_for_query(b: Dict[str, Any], query_tokens: List[str], selected_iso2: Optional[str]) -> float:
+def _expand_theme_tokens(tokens: List[str]) -> List[str]:
+	seen: set = set()
+	out: List[str] = []
+	for tok in tokens:
+		for candidate in [tok, *(_THEME_EXPANSIONS.get(tok) or [])]:
+			if candidate in seen:
+				continue
+			seen.add(candidate)
+			out.append(candidate)
+	return out
+
+
+def _infer_geo_iso2_from_query(user_text: str, available_countries: List[Dict[str, str]]) -> Optional[set]:
+	available = {
+		str(c.get("iso2") or "").upper()
+		for c in (available_countries or [])
+		if isinstance(c, dict) and isinstance(c.get("iso2"), str) and len(str(c.get("iso2"))) == 2
+	}
+	if not available:
+		return None
+
+	norm = _normalize_text(user_text)
+	if not norm:
+		return None
+
+	matched: set = set()
+	for keyword, region_iso in _REGION_KEYWORDS.items():
+		kw = keyword.replace(" ", "")
+		if keyword in norm or kw in norm.replace(" ", ""):
+			matched |= (region_iso & available)
+
+	for c in available_countries or []:
+		if not isinstance(c, dict):
+			continue
+		iso2 = str(c.get("iso2") or "").upper()
+		name = _normalize_text(c.get("name") or "")
+		if iso2 in available and name and len(name) >= 4 and name in norm:
+			matched.add(iso2)
+
+	return matched if matched else None
+
+
+def _theme_tokens_from_query(
+	raw_tokens: List[str],
+	expanded_tokens: List[str],
+	geo_iso2: Optional[set],
+	available_countries: List[Dict[str, str]]
+) -> List[str]:
+	geo_terms: set = set()
+	for keyword in _REGION_KEYWORDS:
+		for part in keyword.split():
+			geo_terms.add(part)
+	for c in available_countries or []:
+		if not isinstance(c, dict):
+			continue
+		name = _normalize_text(c.get("name") or "")
+		if name:
+			for part in name.split():
+				if len(part) >= 3:
+					geo_terms.add(part)
+
+	out: List[str] = []
+	seen: set = set()
+	for tok in expanded_tokens:
+		if tok in geo_terms or tok in seen:
+			continue
+		seen.add(tok)
+		out.append(tok)
+	return out
+
+
+def _book_geo_iso2(b: Dict[str, Any]) -> set:
+	sets = b.get("_iso2_sets") or {}
+	if not isinstance(sets, dict):
+		return set()
+	any_set = sets.get("any") or set()
+	return set(any_set) if isinstance(any_set, set) else set()
+
+
+def _book_matches_geo(b: Dict[str, Any], geo_iso2: Optional[set]) -> bool:
+	if not geo_iso2:
+		return True
+	return bool(_book_geo_iso2(b) & geo_iso2)
+
+
+def _book_matches_theme(b: Dict[str, Any], theme_tokens: List[str]) -> bool:
+	if not theme_tokens:
+		return True
+	blob = str(b.get("_blob") or "")
+	return any(tok in blob for tok in theme_tokens)
+
+
+def _score_book_for_query(
+	b: Dict[str, Any],
+	query_tokens: List[str],
+	selected_iso2: Optional[str],
+	geo_iso2: Optional[set] = None,
+	theme_tokens: Optional[List[str]] = None
+) -> float:
 	score = 0.0
 	blob = str(b.get("_blob") or "")
-	if query_tokens and blob:
-		for tok in query_tokens:
+	themes = theme_tokens if theme_tokens else query_tokens
+	if themes and blob:
+		for tok in themes:
 			if tok in blob:
 				score += 1.0
+	if geo_iso2 and (_book_geo_iso2(b) & geo_iso2):
+		score += 3.0
 	if selected_iso2:
 		sets = b.get("_iso2_sets") or {}
 		if isinstance(sets, dict):
@@ -340,25 +474,53 @@ def _score_book_for_query(b: Dict[str, Any], query_tokens: List[str], selected_i
 def _build_tiered_candidates(
 	all_books: List[Dict[str, Any]],
 	user_text: str,
-	selected_iso2: Optional[str]
+	selected_iso2: Optional[str],
+	available_countries: Optional[List[Dict[str, str]]] = None
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, int]]:
 	if not all_books:
 		return [], [], {"tier1": 0, "tier2": 0, "total": 0}
 
-	tokens = _tokenize_query(user_text)
+	raw_tokens = _tokenize_query(user_text)
+	expanded_tokens = _expand_theme_tokens(raw_tokens)
+	geo_iso2 = _infer_geo_iso2_from_query(user_text, available_countries or [])
+	theme_tokens = _theme_tokens_from_query(raw_tokens, expanded_tokens, geo_iso2, available_countries or [])
+
 	scored: List[Tuple[float, str, Dict[str, Any]]] = []
 	for b in all_books:
 		bid = str(b.get("id") or "")
-		scored.append((_score_book_for_query(b, tokens, selected_iso2), bid, b))
+		scored.append((
+			_score_book_for_query(b, expanded_tokens, selected_iso2, geo_iso2, theme_tokens),
+			bid,
+			b
+		))
 
 	scored.sort(key=lambda x: (-x[0], x[1]))
 
-	tier1_count = min(TIER1_DETAIL_COUNT, len(scored))
-	tier1 = [b for _, _, b in scored[:tier1_count]]
-	tier1_ids = {str(b.get("id") or "") for b in tier1}
+	tier1: List[Dict[str, Any]] = []
+	tier1_ids: set = set()
+
+	# Pin geo+theme matches so regional themed queries stay in the detailed tier.
+	if geo_iso2 and theme_tokens:
+		for b in all_books:
+			if not _book_matches_geo(b, geo_iso2) or not _book_matches_theme(b, theme_tokens):
+				continue
+			bid = str(b.get("id") or "")
+			if not bid or bid in tier1_ids:
+				continue
+			tier1.append(b)
+			tier1_ids.add(bid)
+
+	for _, _, b in scored:
+		if len(tier1) >= TIER1_DETAIL_COUNT:
+			break
+		bid = str(b.get("id") or "")
+		if not bid or bid in tier1_ids:
+			continue
+		tier1.append(b)
+		tier1_ids.add(bid)
 
 	tier2: List[Dict[str, Any]] = []
-	for _, _, b in scored[tier1_count:]:
+	for _, _, b in scored:
 		bid = str(b.get("id") or "")
 		if not bid or bid in tier1_ids:
 			continue
@@ -369,6 +531,8 @@ def _build_tiered_candidates(
 			"id": b.get("id"),
 			"title": b.get("title"),
 			"author": b.get("author"),
+			"tags": b.get("tags")[:12] if isinstance(b.get("tags"), list) else [],
+			"categories": b.get("categories")[:8] if isinstance(b.get("categories"), list) else [],
 			"places": places
 		})
 
@@ -654,6 +818,25 @@ def _attach_book_display(clean: Dict[str, Any], by_id: Dict[str, Dict[str, Any]]
 	return clean
 
 
+def _catalog_already_fully_detailed(tier_stats: Dict[str, int]) -> bool:
+	total = int(tier_stats.get("total") or 0)
+	tier2 = int(tier_stats.get("tier2") or 0)
+	return total > 0 and tier2 == 0
+
+
+def _should_retry_full_catalog(
+	parsed: Dict[str, Any],
+	clean: Dict[str, Any],
+	tier_stats: Dict[str, int]
+) -> bool:
+	if _catalog_already_fully_detailed(tier_stats):
+		return False
+	if not parsed:
+		return True
+	recs = clean.get("recommendations")
+	return not (isinstance(recs, list) and recs)
+
+
 # ─────────── HTTP Function ───────────
 @https_fn.on_request(secrets=["OPENAI_API_KEY"])
 def atlasChat(req: https_fn.Request) -> https_fn.Response:
@@ -728,7 +911,9 @@ def atlasChat(req: https_fn.Request) -> https_fn.Response:
 			history.append({"role": role, "content": content.strip()})
 
 	try:
-		tier1, tier2, tier_stats = _build_tiered_candidates(all_books, last_user_text, selected_iso2)
+		tier1, tier2, tier_stats = _build_tiered_candidates(
+			all_books, last_user_text, selected_iso2, available_countries
+		)
 
 		def _call_recommender(detail: List[Dict[str, Any]], index: List[Dict[str, Any]]) -> Dict[str, Any]:
 			return _recommend_with_llm(
@@ -742,16 +927,21 @@ def atlasChat(req: https_fn.Request) -> https_fn.Response:
 			)
 
 		parsed = _call_recommender(tier1, tier2)
-		if not parsed:
-			parsed = _call_recommender(all_books, [])
+		clean = _validate_payload(parsed or {}, by_id, last_user_text)
+		candidate_pass = "tiered"
 
-		clean = _validate_payload(parsed, by_id, last_user_text)
+		if _should_retry_full_catalog(parsed or {}, clean, tier_stats):
+			parsed_full = _call_recommender(all_books, [])
+			clean_full = _validate_payload(parsed_full or {}, by_id, last_user_text)
+			candidate_pass = "full_catalog" if not parsed else "full_catalog_retry"
+			clean = clean_full
 
 		if debug:
 			clean["debug"] = {
 				"tier1": tier_stats.get("tier1"),
 				"tier2": tier_stats.get("tier2"),
 				"catalog_total": tier_stats.get("total"),
+				"candidate_pass": candidate_pass,
 				"countries": len(available_countries or []),
 				"selected_iso2": selected_iso2,
 				"model": ATLAS_CHAT_MODEL,
