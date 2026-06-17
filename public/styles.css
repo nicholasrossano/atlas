@@ -411,7 +411,7 @@ body.atlas-chat-expanded .atlas-info {
 	margin: 0;
 }
 
-.atlas-book-editor-read {
+.atlas-book-editor-pick {
 	align-self: flex-start;
 	padding: 5px 12px;
 	border-radius: 999px;
@@ -1444,7 +1444,7 @@ body.atlas-view-list .atlas-list-view {
 	gap: 5px;
 	min-width: 0;
 }
-.atlas-list-view .atlas-book-editor-read {
+.atlas-list-view .atlas-book-editor-pick {
 	font-size: 9px;
 	padding: 3px 8px;
 }

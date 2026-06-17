@@ -1,7 +1,7 @@
 // Atlas/public/js/app.js
 
 // ─────────── Section Header ───────────
-console.log("[atlas] app.js v44 booting");
+console.log("[atlas] app.js v47 booting");
 
 // ─────────── Section Header ───────────
 const atlasConfig = window.ATLAS_CONFIG || {};
@@ -248,7 +248,7 @@ function recordBookFromApi(data){
 		google_books_url: data.google_books_url || "",
 		bookshop_url: bookshopUrl,
 		tags: normalizeTagList(data.tags),
-		read: data.read === true,
+		stamp: data.stamp === true,
 		iso2Sets: iso2SetsForRecord(data)
 	};
 }
@@ -396,6 +396,11 @@ function hasIso2Match(iso2Sets, candidates){
 }
 
 const HIDDEN_BOOK_TAGS = new Set(["needs review"]);
+const EDITORS_PICK_LABEL = "Editor's Pick";
+
+function isEditorsPick(book){
+	return book && book.stamp === true;
+}
 
 function isPublicBookTag(tag){
 	const text = String(tag || "").trim();
@@ -617,7 +622,6 @@ function buildBookDetailHtml(book){
 	const summaryHtml = buildBookBlurbHtml(book);
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
 	const hasBuy = rawBuyUrl.length > 0;
-	const isEditorRead = book.read === true;
 	const tags = Array.isArray(book.tags) ? book.tags : [];
 
 	let buyButtonHtml = "";
@@ -625,9 +629,9 @@ function buildBookDetailHtml(book){
 		buyButtonHtml = `<a class="atlas-book-buy" href="${escapeHtml(rawBuyUrl)}" target="_blank" rel="noopener">Buy</a>`;
 	}
 
-	let editorReadHtml = "";
-	if (isEditorRead){
-		editorReadHtml = `<div class="atlas-book-editor-read">Editor Read</div>`;
+	let editorPickHtml = "";
+	if (isEditorsPick(book)){
+		editorPickHtml = `<div class="atlas-book-editor-pick">${escapeHtml(EDITORS_PICK_LABEL)}</div>`;
 	}
 
 	let tagsHtml = buildBookTagsHtml(tags);
@@ -642,7 +646,7 @@ function buildBookDetailHtml(book){
   <img class="atlas-book-detail-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
   <div class="atlas-book-detail-meta">
   <div class="atlas-book-detail-text">
-   ${editorReadHtml}
+   ${editorPickHtml}
    <div class="atlas-book-detail-title">${escapeHtml(title)}</div>
    <div class="atlas-book-detail-author">${escapeHtml(author)}</div>
    ${tagsHtml}
@@ -679,9 +683,8 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
 	const safeAlt = `Cover of '${title}'`;
 	const tagsHtml = buildBookTagsHtml(book.tags);
-	const isEditorRead = book.read === true;
-	const editorReadHtml = isEditorRead
-		? `<div class="atlas-book-editor-read">Editor Read</div>`
+	const editorPickHtml = isEditorsPick(book)
+		? `<div class="atlas-book-editor-pick">${escapeHtml(EDITORS_PICK_LABEL)}</div>`
 		: "";
 	const expandable = bookHasExpandableContent(book);
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
@@ -714,7 +717,7 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 		<div class="atlas-book${bookActionClass}" ${bookAttrs}>
 			<img class="atlas-book-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
 			<div class="atlas-list-book-main">
-				${editorReadHtml}
+				${editorPickHtml}
 				<div class="atlas-book-meta">
 					<div class="atlas-book-title">${escapeHtml(title)}</div>
 					<div class="atlas-book-author">${escapeHtml(author)}</div>
@@ -2133,6 +2136,7 @@ const filterControlsEl = document.querySelector(".atlas-filter-controls");
 let viewMode = "map";
 let filterPanelOpen = false;
 let listFilterCountry = null;
+let listFilterEditorsPick = false;
 const listFilterTags = new Set();
 let listSections = [];
 let listViewLoading = false;
@@ -2228,7 +2232,7 @@ function computeAllTags(records){
 	return Array.from(out).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-function applyListFilters(records, { countryIso, tags }){
+function applyListFilters(records, { countryIso, tags, editorsPick }){
 	const country = countryIso ? String(countryIso).toUpperCase() : null;
 	const tagList = Array.isArray(tags)
 		? tags.filter(Boolean).map(t => String(t).toLowerCase())
@@ -2238,8 +2242,9 @@ function applyListFilters(records, { countryIso, tags }){
 		const overrides = rec.iso2Sets?.override || [];
 		if (!overrides.length) return false;
 
-		// Country (when set) AND any selected tag (OR across tags).
 		if (country && !overrides.includes(country)) return false;
+
+		if (editorsPick && !isEditorsPick(rec)) return false;
 
 		if (tagList.length){
 			const bookTags = (rec.tags || []).map(t => String(t).toLowerCase());
@@ -2272,7 +2277,7 @@ function groupBooksByCountry(records){
 }
 
 function hasActiveListFilters(){
-	return !!(listFilterCountry || listFilterTags.size);
+	return !!(listFilterCountry || listFilterEditorsPick || listFilterTags.size);
 }
 
 function updateFilterBadge(){
@@ -2317,6 +2322,9 @@ function renderListSummary(){
 	if (listFilterCountry){
 		pillsHtml += `<span class="atlas-list-summary-pill">${isoToFlagEmoji(listFilterCountry)} ${escapeHtml(fullCountryName(listFilterCountry))}</span>`;
 	}
+	if (listFilterEditorsPick){
+		pillsHtml += `<span class="atlas-list-summary-pill">${escapeHtml(EDITORS_PICK_LABEL)}</span>`;
+	}
 	for (const tag of listFilterTags){
 		pillsHtml += `<span class="atlas-list-summary-pill">${escapeHtml(tag)}</span>`;
 	}
@@ -2340,11 +2348,13 @@ function renderFilterOptions(records){
 	}
 
 	const tags = computeAllTags(records);
-	filterTagsEl.innerHTML = tags.map((tag, idx) => {
+	const editorsPickChip = `<button type="button" class="atlas-filter-chip${listFilterEditorsPick ? " is-selected" : ""}" data-editors-pick="1" style="--tag-color:${BOOK_TAG_COLORS[0]};">${escapeHtml(EDITORS_PICK_LABEL)}</button>`;
+	const tagChips = tags.map((tag, idx) => {
 		const selected = listFilterTags.has(tag);
-		const color = BOOK_TAG_COLORS[idx % BOOK_TAG_COLORS.length];
+		const color = BOOK_TAG_COLORS[(idx + 1) % BOOK_TAG_COLORS.length];
 		return `<button type="button" class="atlas-filter-chip${selected ? " is-selected" : ""}" data-tag="${escapeHtml(tag)}" style="--tag-color:${color};">${escapeHtml(tag)}</button>`;
 	}).join("");
+	filterTagsEl.innerHTML = editorsPickChip + tagChips;
 
 	updateFilterBadge();
 }
@@ -2405,7 +2415,8 @@ async function renderListView(){
 
 		const filtered = applyListFilters(records, {
 			countryIso: listFilterCountry,
-			tags: Array.from(listFilterTags)
+			tags: Array.from(listFilterTags),
+			editorsPick: listFilterEditorsPick
 		});
 		listSections = groupBooksByCountry(filtered);
 
@@ -2488,10 +2499,12 @@ async function openBookInListView(bookId){
 	listExpandedBookId = book && bookHasExpandableContent(book) ? bookId : null;
 	const filtered = applyListFilters(records, {
 		countryIso: listFilterCountry,
-		tags: Array.from(listFilterTags)
+		tags: Array.from(listFilterTags),
+		editorsPick: listFilterEditorsPick
 	});
 	if (!filtered.some(r => r.id === bookId) && hasActiveListFilters()){
 		listFilterCountry = null;
+		listFilterEditorsPick = false;
 		listFilterTags.clear();
 		syncCountryFilterInput();
 		hideCountryFilterResults();
@@ -2576,6 +2589,7 @@ function toggleFilterPanel(open){
 
 function clearListFilters(){
 	listFilterCountry = null;
+	listFilterEditorsPick = false;
 	listFilterTags.clear();
 	listExpandedBookId = null;
 	syncCountryFilterInput();
@@ -2661,14 +2675,19 @@ function setupListView(){
 		filterTagsEl.addEventListener("click", (event) => {
 			const btn = event.target.closest(".atlas-filter-chip");
 			if (!btn) return;
-			const tag = btn.getAttribute("data-tag");
-			if (!tag) return;
-			if (listFilterTags.has(tag)){
-				listFilterTags.delete(tag);
-				btn.classList.remove("is-selected");
+			if (btn.hasAttribute("data-editors-pick")){
+				listFilterEditorsPick = !listFilterEditorsPick;
+				btn.classList.toggle("is-selected", listFilterEditorsPick);
 			} else {
-				listFilterTags.add(tag);
-				btn.classList.add("is-selected");
+				const tag = btn.getAttribute("data-tag");
+				if (!tag) return;
+				if (listFilterTags.has(tag)){
+					listFilterTags.delete(tag);
+					btn.classList.remove("is-selected");
+				} else {
+					listFilterTags.add(tag);
+					btn.classList.add("is-selected");
+				}
 			}
 			updateFilterBadge();
 			if (viewMode === "list") renderListView();

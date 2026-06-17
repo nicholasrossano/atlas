@@ -153,6 +153,7 @@ class AtlasCatalogTests(unittest.TestCase):
 			"bookshop_url": "https://bookshop.org/buy",
 			"tags": ["Gay"],
 			"read": True,
+			"stamp": True,
 			"country_override": "US",
 			"setting_country": ["FR"],
 			"author_country": [],
@@ -161,6 +162,7 @@ class AtlasCatalogTests(unittest.TestCase):
 		self.assertEqual(rec["id"], "abc")
 		self.assertEqual(rec["tags"], ["Gay"])
 		self.assertTrue(rec["read"])
+		self.assertTrue(rec["stamp"])
 		self.assertEqual(rec["country_override"], "US")
 		self.assertEqual(rec["description"], "Publisher description")
 		self.assertEqual(rec["google_books_url"], "https://books.google.com/books?id=rvePDwAAQBAJ")

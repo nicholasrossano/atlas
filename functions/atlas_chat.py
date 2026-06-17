@@ -261,6 +261,7 @@ def _load_atlas_books_cached() -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str
 			"info_link": str(data.get("info_link") or "").strip(),
 			"preview_link": str(data.get("preview_link") or "").strip(),
 			"read": data.get("read") is True,
+			"stamp": data.get("stamp") is True,
 		}
 
 		rec["_places"] = _places_for_book(rec)
@@ -877,6 +878,7 @@ def _book_record_for_client(rec: Dict[str, Any]) -> Dict[str, Any]:
 		"bookshop_url": str(rec.get("bookshop_url") or "").strip(),
 		"tags": rec.get("tags") if isinstance(rec.get("tags"), list) else [],
 		"read": rec.get("read") is True,
+		"stamp": rec.get("stamp") is True,
 		"country_override": rec.get("country_override") if rec.get("country_override") is not None else "",
 		"setting_country": rec.get("setting_country") if isinstance(rec.get("setting_country"), list) else [],
 		"author_country": rec.get("author_country") if isinstance(rec.get("author_country"), list) else [],
