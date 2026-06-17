@@ -704,7 +704,7 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 		? `<span class="atlas-list-book-chevron" aria-hidden="true"></span>`
 		: "";
 	const actionsHtml = hasActions
-		? `<div class="atlas-list-book-actions">${buyHtml}${chevronHtml}</div>`
+		? `<div class="atlas-list-book-actions">${chevronHtml}${buyHtml}</div>`
 		: "";
 	const panelHtml = expandable
 		? `<div class="atlas-list-book-panel-wrap">
