@@ -20,7 +20,14 @@ try:
 except ValueError:
 	initialize_app()
 
-db = firestore.client()
+_db = None
+
+
+def _get_db():
+	global _db
+	if _db is None:
+		_db = firestore.client()
+	return _db
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -214,7 +221,7 @@ def _load_atlas_books_cached() -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str
 		return _ATLAS_BOOK_CACHE, _ATLAS_BOOK_BY_ID, _ATLAS_AVAILABLE_COUNTRIES_CACHE
 
 	try:
-		docs = db.collection("atlasBooks").stream()
+		docs = _get_db().collection("atlasBooks").stream()
 	except Exception as e:
 		logger.error(f"[atlasChat] Firestore stream error: {e}")
 		return _ATLAS_BOOK_CACHE, _ATLAS_BOOK_BY_ID, _ATLAS_AVAILABLE_COUNTRIES_CACHE
