@@ -250,7 +250,6 @@ body.atlas-chat-expanded .atlas-info {
 .atlas-info .atlas-book {
 	background: var(--atlas-panel-sub-bg);
 	border: var(--atlas-panel-sub-border);
-	box-shadow: var(--atlas-shadow);
 }
 .atlas-info .atlas-book:hover { background: var(--atlas-panel-bg); }
 .atlas-book-cover {
@@ -377,7 +376,7 @@ body.atlas-chat-expanded .atlas-info {
 	display: grid;
 	grid-template-columns: 120px minmax(0, 1fr);
 	grid-column-gap: 12px;
-	align-items: start;
+	align-items: center;
 	margin-top: 0;
 }
 
@@ -388,7 +387,6 @@ body.atlas-chat-expanded .atlas-info {
 	border-radius: 10px;
 	box-shadow: 0 1px 4px rgba(0,0,0,.14);
 	background: #eee;
-	align-self: flex-start;
 }
 
 .atlas-book-detail-meta {
@@ -401,7 +399,6 @@ body.atlas-chat-expanded .atlas-info {
 	padding-right: 4px;
 	box-sizing: border-box;
 	min-height: 180px;
-	justify-content: flex-start;
 }
 
 .atlas-book-detail-text {
@@ -409,6 +406,9 @@ body.atlas-chat-expanded .atlas-info {
 	flex-direction: column;
 	gap: 6px;
 	margin: 0;
+	flex: 1;
+	justify-content: center;
+	min-height: 0;
 }
 
 .atlas-book-editor-pick {
@@ -460,7 +460,7 @@ body.atlas-chat-expanded .atlas-info {
 
 .atlas-book-buy {
 	align-self: flex-end;
-	margin-top: auto;
+	margin-top: 0;
 	margin-right: 0;
 	margin-bottom: 0;
 	padding: 7px 18px;
