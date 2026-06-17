@@ -597,29 +597,21 @@ body.atlas-chat-expanded .atlas-info {
 	pointer-events: auto;
 	border-radius: var(--atlas-radius-panel);
 	overflow: hidden;
-	transition: border-radius 240ms ease;
 }
 
 /* ─────────── Chat collapsed/expanded ─────────── */
-.atlas-chat.is-collapsed .atlas-chat-shell{
-	border-radius: var(--atlas-radius-pill);
-}
-
 .atlas-chat-body{
 	pointer-events: none;
 	opacity: 0;
 	max-height: 0;
 	overflow: hidden;
-	transform: translateY(8px) scale(0.98);
-	transform-origin: bottom center;
-	transition: opacity 200ms ease, max-height 240ms ease, transform 200ms ease;
+	transition: opacity 200ms ease, max-height 240ms ease;
 }
 
 .atlas-chat.is-expanded .atlas-chat-body{
 	pointer-events: auto;
 	opacity: 1;
 	max-height: min(52vh, 500px);
-	transform: translateY(0) scale(1);
 }
 
 .atlas-chat.is-collapsed .atlas-chat-input-row{
@@ -860,7 +852,6 @@ body.atlas-chat-expanded .atlas-info {
 	background: #301900;
 	color: #fff;
 	cursor: pointer;
-	transition: padding 200ms ease, border-radius 200ms ease;
 }
 
 .atlas-chat-send:disabled{
