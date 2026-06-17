@@ -51,12 +51,16 @@ const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
 const BORDER_COLOR = "#FFFFFD";
 
-const MIN_ZOOM = 1.3, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.3;
+const MIN_ZOOM = 1.3, MAX_ZOOM = 5, INITIAL_ZOOM = 1.3;
 const MIN_LAT = -60, MAX_LAT = 85;
-// Slightly inset from ±180 so MapLibre treats bounds as a range, not “no limit”.
-const MAP_MAX_BOUNDS = [[-179.9, MIN_LAT], [179.9, MAX_LAT]];
+// Inset west of ±180 so MapLibre treats bounds as a range. West bound is tighter so
+// far-eastern Russia (stored west of the antimeridian) stays with Asia, not the left edge.
+const MAP_MAX_BOUNDS = [[-168, MIN_LAT], [179.9, MAX_LAT]];
 const MIN_LNG = MAP_MAX_BOUNDS[0][0];
 const MAX_LNG = MAP_MAX_BOUNDS[1][0];
+// Atlantic-centered default — conventional world view; keeps the Pacific seam off-screen.
+const MAP_LNG_CENTER = 10;
+const INITIAL_CENTER = [MAP_LNG_CENTER, 0];
 const ZOOM_LABEL_SWITCH = 2.0;
 
 const SELECT_ZOOM = 2.5;
@@ -149,7 +153,7 @@ function enforceLngBounds(){
 	const center = map.getCenter();
 
 	if (lngSpan >= maxLngSpan) {
-		const lng = (MIN_LNG + MAX_LNG) / 2;
+		const lng = MAP_LNG_CENTER;
 		if (Math.abs(center.lng - lng) > 1e-6) map.setCenter([lng, center.lat]);
 		return;
 	}
