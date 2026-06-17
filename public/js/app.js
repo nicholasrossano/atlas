@@ -51,7 +51,7 @@ const HIGHLIGHT_COLOR = "#301900";
 const BLUSH_COLOR = "#ECE4DB";
 const BORDER_COLOR = "#FFFFFD";
 
-const MIN_ZOOM = 1, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1;
+const MIN_ZOOM = 1.3, MAX_ZOOM = 5, INITIAL_CENTER = [0,0], INITIAL_ZOOM = 1.3;
 const MIN_LAT = -60, MAX_LAT = 85;
 const ZOOM_LABEL_SWITCH = 2.0;
 
@@ -109,7 +109,7 @@ const map = new maplibregl.Map({
 	zoom: INITIAL_ZOOM,
 	minZoom: MIN_ZOOM,
 	maxZoom: MAX_ZOOM,
-	renderWorldCopies: true,
+	renderWorldCopies: false,
 	preserveDrawingBuffer: true,
 	pitchWithRotate: false,
 	dragRotate: false,
