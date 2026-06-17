@@ -27,9 +27,9 @@ PRs and suggestions are also welcome! If you have feedback, ideas, or want to he
 
 ## Local development
 
-1. Copy `public/config.example.js` to `public/config.js` and fill in Firebase + MapTiler values.
-2. Serve `public/` with any static server, or use Firebase emulators.
-3. Cloud Function: `cd functions && pip install -r requirements.txt` then deploy or emulate `atlasChat`.
-4. Firestore rules: `firebase deploy --only firestore:rules` (map reads `atlasBooks` client-side; rules must allow public read).
+1. Copy `public/config.example.js` to `public/config.js` and fill in MapTiler + Atlas API endpoints.
+2. Serve `public/` with any static server. Book data loads from the `atlasCatalog` Cloud Function (not client Firestore), so local UI works best with emulators or a deployed catalog endpoint in config.
+3. Cloud Functions: `cd functions && pip install -r requirements.txt` then deploy or emulate `atlasCatalog` and `atlasChat`.
+4. Do **not** deploy `firestore.rules` from this repo if the Firebase project is shared with Ponder — Atlas reads `atlasBooks` via the Admin SDK in Cloud Functions only.
 5. Audit missing map pins: `python functions/scripts/audit_country_override.py` (dry-run CSV report).
 6. Run function tests: `cd functions && python -m unittest test_atlas_chat.py`.

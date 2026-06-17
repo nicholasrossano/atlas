@@ -44,12 +44,17 @@ _ATLAS_AVAILABLE_COUNTRIES_CACHE: List[Dict[str, str]] = []
 
 
 # ─────────── Response helpers ───────────
-def _json_response(body: Dict[str, Any], status: int = 200) -> https_fn.Response:
+def _json_response(
+	body: Dict[str, Any],
+	status: int = 200,
+	*,
+	methods: str = "POST, OPTIONS",
+) -> https_fn.Response:
 	headers = {
 		"Content-Type": "application/json",
 		"Access-Control-Allow-Origin": "*",
 		"Access-Control-Allow-Headers": "Content-Type",
-		"Access-Control-Allow-Methods": "POST, OPTIONS",
+		"Access-Control-Allow-Methods": methods,
 	}
 	return https_fn.Response(json.dumps(body, ensure_ascii=False), status=status, headers=headers)
 
@@ -252,6 +257,7 @@ def _load_atlas_books_cached() -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str
 			"author_origin": data.get("author_origin") if data.get("author_origin") is not None else [],
 			"cover_url": str(data.get("cover_url") or "").strip(),
 			"bookshop_url": str(data.get("bookshop_url") or "").strip(),
+			"read": data.get("read") is True,
 		}
 
 		rec["_places"] = _places_for_book(rec)
@@ -844,7 +850,42 @@ def _should_retry_full_catalog(
 	return not (isinstance(recs, list) and recs)
 
 
-# ─────────── HTTP Function ───────────
+def _book_record_for_client(rec: Dict[str, Any]) -> Dict[str, Any]:
+	return {
+		"id": str(rec.get("id") or "").strip(),
+		"title": str(rec.get("title") or "").strip(),
+		"author": str(rec.get("author") or "").strip(),
+		"cover_url": str(rec.get("cover_url") or "").strip(),
+		"summary": str(rec.get("summary") or "").strip(),
+		"bookshop_url": str(rec.get("bookshop_url") or "").strip(),
+		"tags": rec.get("tags") if isinstance(rec.get("tags"), list) else [],
+		"read": rec.get("read") is True,
+		"country_override": rec.get("country_override") if rec.get("country_override") is not None else "",
+		"setting_country": rec.get("setting_country") if isinstance(rec.get("setting_country"), list) else [],
+		"author_country": rec.get("author_country") if isinstance(rec.get("author_country"), list) else [],
+		"author_origin": rec.get("author_origin") if isinstance(rec.get("author_origin"), list) else [],
+	}
+
+
+# ─────────── HTTP Functions ───────────
+@https_fn.on_request()
+def atlasCatalog(req: https_fn.Request) -> https_fn.Response:
+	cors_methods = "GET, OPTIONS"
+	if req.method == "OPTIONS":
+		return _json_response({"ok": True}, status=204, methods=cors_methods)
+
+	if req.method != "GET":
+		return _json_response({"error": "method_not_allowed"}, status=405, methods=cors_methods)
+
+	try:
+		items, _, _ = _load_atlas_books_cached()
+		books = [_book_record_for_client(rec) for rec in items]
+		return _json_response({"books": books, "count": len(books)}, methods=cors_methods)
+	except Exception as e:
+		logger.error(f"[atlasCatalog] failed: {e}\n{traceback.format_exc()}")
+		return _json_response({"error": "catalog_unavailable"}, status=500, methods=cors_methods)
+
+
 @https_fn.on_request(secrets=["OPENAI_API_KEY"])
 def atlasChat(req: https_fn.Request) -> https_fn.Response:
 	if req.method == "OPTIONS":

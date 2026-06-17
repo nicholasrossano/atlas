@@ -2,6 +2,7 @@ import unittest
 
 from atlas_chat import (
 	_attach_book_display,
+	_book_record_for_client,
 	_build_tiered_candidates,
 	_catalog_already_fully_detailed,
 	_infer_geo_iso2_from_query,
@@ -138,6 +139,28 @@ class ValidatePayloadTests(unittest.TestCase):
 			"build": "test"
 		}, {})
 		self.assertEqual(clean["books"], [])
+
+
+class AtlasCatalogTests(unittest.TestCase):
+	def test_book_record_for_client_shape(self):
+		rec = _book_record_for_client({
+			"id": "abc",
+			"title": "Title",
+			"author": "Author",
+			"cover_url": "https://example.com/cover.jpg",
+			"summary": "Summary",
+			"bookshop_url": "https://bookshop.org/buy",
+			"tags": ["Gay"],
+			"read": True,
+			"country_override": "US",
+			"setting_country": ["FR"],
+			"author_country": [],
+			"author_origin": ["DE"],
+		})
+		self.assertEqual(rec["id"], "abc")
+		self.assertEqual(rec["tags"], ["Gay"])
+		self.assertTrue(rec["read"])
+		self.assertEqual(rec["country_override"], "US")
 
 
 if __name__ == "__main__":

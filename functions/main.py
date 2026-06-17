@@ -1,1 +1,1 @@
-from atlas_chat import atlasChat  # noqa: F401
+from atlas_chat import atlasCatalog, atlasChat  # noqa: F401

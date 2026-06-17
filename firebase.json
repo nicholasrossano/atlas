@@ -1,7 +1,4 @@
 {
-  "firestore": {
-    "rules": "firestore.rules"
-  },
   "hosting": {
     "target": "map",
     "public": "public",
@@ -9,6 +6,12 @@
       "firebase.json",
       "**/.*",
       "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "/api/atlas/books",
+        "function": "atlasCatalog"
+      }
     ]
   },
   "functions": [
