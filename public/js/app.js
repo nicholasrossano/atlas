@@ -630,15 +630,7 @@ function buildBookExpandPanelHtml(book){
 	const blurb = getBookDisplayBlurb(book);
 	if (!blurb) return "";
 
-	const isEditorRead = book.read === true;
 	const summaryHtml = buildBookBlurbHtml(book, { showCitation: false });
-
-	let editorReadHtml = "";
-	if (isEditorRead){
-		editorReadHtml = `<div class="atlas-book-editor-read">Editor Read</div>`;
-	}
-
-	const bodyParts = [editorReadHtml, summaryHtml].filter(Boolean);
 	const footerParts = [];
 	if (blurb.source === "google" && blurb.citationUrl){
 		footerParts.push(`<a class="atlas-book-blurb-citation atlas-list-book-blurb-citation" href="${escapeHtml(blurb.citationUrl)}" target="_blank" rel="noopener">Google Books</a>`);
@@ -648,7 +640,7 @@ function buildBookExpandPanelHtml(book){
 		? `<div class="atlas-list-book-panel-footer">${footerParts.join("")}</div>`
 		: "";
 
-	return bodyParts.join("") + footerHtml;
+	return summaryHtml + footerHtml;
 }
 
 function renderListViewBookRow(book, idx, iso, isExpanded){
@@ -657,6 +649,10 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
 	const safeAlt = `Cover of '${title}'`;
 	const tagsHtml = buildBookTagsHtml(book.tags);
+	const isEditorRead = book.read === true;
+	const editorReadHtml = isEditorRead
+		? `<div class="atlas-book-editor-read">Editor Read</div>`
+		: "";
 	const expandable = bookHasExpandableContent(book);
 	const rawBuyUrl = String(book.bookshop_url || "").trim();
 	const hasBuy = rawBuyUrl.length > 0;
@@ -688,11 +684,12 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 		<div class="atlas-book${bookActionClass}" ${bookAttrs}>
 			<img class="atlas-book-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
 			<div class="atlas-list-book-main">
-				${tagsHtml}
+				${editorReadHtml}
 				<div class="atlas-book-meta">
 					<div class="atlas-book-title">${escapeHtml(title)}</div>
 					<div class="atlas-book-author">${escapeHtml(author)}</div>
 				</div>
+				${tagsHtml}
 			</div>
 			${actionsHtml}
 		</div>
