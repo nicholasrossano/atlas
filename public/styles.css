@@ -622,19 +622,19 @@ body.atlas-chat-expanded .atlas-info {
 
 .atlas-chat.is-collapsed .atlas-chat-input-row{
 	border-top-color: transparent;
-	padding: 10px 12px;
+	padding: 8px 12px;
 	align-items: center;
 }
 
 .atlas-chat.is-collapsed .atlas-chat-input{
-	height: 42px;
-	max-height: 42px;
-	padding: 10px 0;
+	height: 34px;
+	max-height: 34px;
+	padding: 8px 0;
 }
 
 .atlas-chat.is-collapsed .atlas-chat-send{
-	width: 42px;
-	height: 42px;
+	width: 32px;
+	height: 32px;
 }
 
 .atlas-chat-header{
@@ -773,8 +773,8 @@ body.atlas-chat-expanded .atlas-info {
 .atlas-chat-input-row{
 	display: flex;
 	align-items: center;
-	gap: 10px;
-	padding: 10px 12px;
+	gap: 8px;
+	padding: 8px 12px;
 	border-top: 1px solid rgba(0,0,0,0.06);
 	transition: border-top-color 200ms ease, padding 200ms ease;
 }
@@ -815,15 +815,15 @@ body.atlas-chat-expanded .atlas-info {
 .atlas-chat-input{
 	flex: 1;
 	box-sizing: border-box;
-	min-height: 40px;
-	height: 40px;
+	min-height: 34px;
+	height: 34px;
 	resize: none;
 	border: 0;
 	outline: none;
 	border-radius: 0;
-	padding: 10px 0;
+	padding: 8px 0;
 	background: transparent;
-	font: 650 14px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+	font: 650 13px/1.3 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
 	color: #111;
 	transition: height 200ms ease, max-height 200ms ease, padding 200ms ease;
 }
@@ -840,8 +840,8 @@ body.atlas-chat-expanded .atlas-info {
 	appearance: none;
 	border: 0;
 	border-radius: 50%;
-	width: 40px;
-	height: 40px;
+	width: 32px;
+	height: 32px;
 	flex: 0 0 auto;
 	display: inline-flex;
 	align-items: center;
@@ -854,8 +854,8 @@ body.atlas-chat-expanded .atlas-info {
 }
 
 .atlas-chat-send-icon{
-	width: 34px;
-	height: 34px;
+	width: 28px;
+	height: 28px;
 	display: block;
 }
 

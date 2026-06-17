@@ -1491,7 +1491,7 @@ function collapseChat(trigger, options){
 	}
 	if (chatInput){
 		chatInput.blur();
-		chatInput.style.height = "40px";
+		chatInput.style.height = "34px";
 	}
 	requestAnimationFrame(placeInfoChip);
 }
@@ -1624,7 +1624,7 @@ function setChatBusy(isBusy){
 
 function autoResizeChatInput(){
 	if (!chatInput) return;
-	const minHeight = 40;
+	const minHeight = 34;
 	const maxHeight = 140;
 	if (!chatIsExpanded){
 		chatInput.style.height = `${minHeight}px`;
