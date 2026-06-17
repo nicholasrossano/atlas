@@ -32,4 +32,5 @@ PRs and suggestions are also welcome! If you have feedback, ideas, or want to he
 3. Cloud Functions: `cd functions && pip install -r requirements.txt` then deploy or emulate `atlasCatalog` and `atlasChat`.
 4. Do **not** deploy `firestore.rules` from this repo if the Firebase project is shared with Ponder — Atlas reads `atlasBooks` via the Admin SDK in Cloud Functions only.
 5. Audit missing map pins: `python functions/scripts/audit_country_override.py` (dry-run CSV report).
-6. Run function tests: `cd functions && python -m unittest test_atlas_chat.py`.
+6. Run function tests: `cd functions && python -m unittest test_atlas_chat.py test_ci_config.py`.
+7. Before changing CI or deploy config, read `AGENTS.md` and run `bash scripts/prepare_functions_venv.sh`.

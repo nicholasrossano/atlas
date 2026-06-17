@@ -18,9 +18,12 @@ jobs:
       - name: Install function dependencies
         run: pip install -r requirements.txt
         working-directory: functions
-      - name: Run atlas_chat unit tests
-        run: python -m unittest test_atlas_chat.py
+      - name: Run function unit tests
+        run: |
+          python -m unittest test_atlas_chat.py test_ci_config.py
         working-directory: functions
+      - name: Verify functions deploy readiness
+        run: bash scripts/prepare_functions_venv.sh
 
   build_and_preview:
     needs: test_functions
