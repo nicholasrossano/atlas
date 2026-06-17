@@ -257,6 +257,9 @@ def _load_atlas_books_cached() -> Tuple[List[Dict[str, Any]], Dict[str, Dict[str
 			"author_origin": data.get("author_origin") if data.get("author_origin") is not None else [],
 			"cover_url": str(data.get("cover_url") or "").strip(),
 			"bookshop_url": str(data.get("bookshop_url") or "").strip(),
+			"google_books_url": str(data.get("google_books_url") or "").strip(),
+			"info_link": str(data.get("info_link") or "").strip(),
+			"preview_link": str(data.get("preview_link") or "").strip(),
 			"read": data.get("read") is True,
 		}
 
@@ -850,6 +853,18 @@ def _should_retry_full_catalog(
 	return not (isinstance(recs, list) and recs)
 
 
+def _google_books_url_for_rec(rec: Dict[str, Any]) -> str:
+	for key in ("google_books_url", "info_link", "preview_link"):
+		val = str(rec.get(key) or "").strip()
+		if val:
+			return val
+	cover = str(rec.get("cover_url") or "")
+	match = re.search(r"[?&]id=([^&]+)", cover)
+	if match:
+		return f"https://books.google.com/books?id={match.group(1)}"
+	return ""
+
+
 def _book_record_for_client(rec: Dict[str, Any]) -> Dict[str, Any]:
 	return {
 		"id": str(rec.get("id") or "").strip(),
@@ -857,6 +872,8 @@ def _book_record_for_client(rec: Dict[str, Any]) -> Dict[str, Any]:
 		"author": str(rec.get("author") or "").strip(),
 		"cover_url": str(rec.get("cover_url") or "").strip(),
 		"summary": str(rec.get("summary") or "").strip(),
+		"description": str(rec.get("description") or "").strip(),
+		"google_books_url": _google_books_url_for_rec(rec),
 		"bookshop_url": str(rec.get("bookshop_url") or "").strip(),
 		"tags": rec.get("tags") if isinstance(rec.get("tags"), list) else [],
 		"read": rec.get("read") is True,

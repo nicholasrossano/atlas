@@ -10,7 +10,7 @@
 		/>
 		<title>Ponder AI | Atlas of Queer Literature</title>
 		<link rel="stylesheet" href="/vendor/maplibre-gl.css" />
-		<link rel="stylesheet" href="/styles.css?v=39" />
+		<link rel="stylesheet" href="/styles.css?v=44" />
 		<script src="/config.js"></script>
 		<script>
 			window.ATLAS_CHAT_ENDPOINT = (window.ATLAS_CONFIG && window.ATLAS_CONFIG.atlas && window.ATLAS_CONFIG.atlas.chatEndpoint) || "";
@@ -20,16 +20,20 @@
 	</head>
 	<body>
 		<header class="atlas-header" aria-label="Map title">
-			<a class="atlas-home"
-				href="https://ponder-app.ai/"
-				aria-label="Go to Ponder home">
-				<svg class="atlas-home-icon" viewBox="0 0 24 24" aria-hidden="true">
-					<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
-				</svg>
-			</a>
-			<div class="atlas-head">
-				<h1 class="atlas-title">Atlas of Queer Literature</h1>
-				<div class="atlas-subtitle">Ponder AI</div>
+			<div class="atlas-header-inner">
+				<div class="atlas-header-body">
+					<a class="atlas-home"
+						href="https://ponder-app.ai/"
+						aria-label="Go to Ponder home">
+						<svg class="atlas-home-icon" viewBox="0 0 24 24" aria-hidden="true">
+							<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"></path>
+						</svg>
+					</a>
+					<div class="atlas-head">
+						<h1 class="atlas-title">Atlas of Queer Literature</h1>
+						<div class="atlas-subtitle">Ponder AI</div>
+					</div>
+				</div>
 			</div>
 		</header>
 
@@ -95,13 +99,33 @@
 
 
 		<div id="atlas-chat" class="atlas-chat is-collapsed" role="region" aria-label="Curator">
+			<div id="atlas-app-banner" class="atlas-app-banner" role="region" aria-label="Download our news app">
+				<button type="button" id="atlas-app-banner-dismiss" class="atlas-app-banner-dismiss" aria-label="Dismiss download banner">
+					<svg class="atlas-app-banner-dismiss-icon" viewBox="0 0 24 24" aria-hidden="true">
+						<path d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z" fill="currentColor"></path>
+					</svg>
+				</button>
+				<a class="atlas-app-banner-link"
+					href="https://apps.apple.com/us/app/ponder-ai/id6503487947"
+					target="_blank"
+					rel="noopener noreferrer">
+					<span class="atlas-app-banner-text">Download our news app!</span>
+					<span class="atlas-app-banner-arrow" aria-hidden="true">
+						<svg class="atlas-app-banner-arrow-icon" viewBox="0 0 24 24" fill="currentColor" focusable="false">
+							<path d="M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm1 5l5 5-5 5v-3H7v-4h6V7z"></path>
+						</svg>
+					</span>
+				</a>
+			</div>
 			<div class="atlas-chat-shell">
-				<div class="atlas-chat-header">
-					<div class="atlas-chat-title">Curator</div>
-					<button id="atlas-chat-clear" class="atlas-chat-clear" type="button">Clear</button>
+				<div class="atlas-chat-body" aria-hidden="true">
+					<div class="atlas-chat-header">
+						<div class="atlas-chat-title">Curator</div>
+						<button id="atlas-chat-clear" class="atlas-chat-clear" type="button">Clear</button>
+					</div>
+					<div id="atlas-chat-thread" class="atlas-chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
+					<div id="atlas-chat-followups" class="atlas-chat-followups-bar" hidden aria-label="Suggested follow-up questions"></div>
 				</div>
-				<div id="atlas-chat-thread" class="atlas-chat-thread" role="log" aria-live="polite" aria-relevant="additions"></div>
-				<div id="atlas-chat-followups" class="atlas-chat-followups-bar" hidden aria-label="Suggested follow-up questions"></div>
 				<div class="atlas-chat-input-row" role="form" aria-label="Send a message">
 					<textarea id="atlas-chat-input" class="atlas-chat-input" rows="1" spellcheck="false" placeholder="Ask anything…"></textarea>
 					<button id="atlas-chat-send" class="atlas-chat-send" type="button" aria-label="Send message">Send</button>
@@ -113,6 +137,6 @@
 		<div id="map" role="application" aria-label="World map highlighting countries on tap"></div>
 
 		<script src="/vendor/maplibre-gl.js"></script>
-		<script type="module" src="/js/app.js?v=atlas-v35"></script>
+		<script type="module" src="/js/app.js?v=atlas-v38"></script>
 	</body>
 </html>
