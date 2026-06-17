@@ -1,7 +1,7 @@
 // Atlas/public/js/app.js
 
 // ─────────── Section Header ───────────
-console.log("[atlas] app.js v38 booting");
+console.log("[atlas] app.js v43 booting");
 
 // ─────────── Section Header ───────────
 const atlasConfig = window.ATLAS_CONFIG || {};
@@ -373,17 +373,25 @@ function hasIso2Match(iso2Sets, candidates){
 	return false;
 }
 
+const HIDDEN_BOOK_TAGS = new Set(["needs review"]);
+
+function isPublicBookTag(tag){
+	const text = String(tag || "").trim();
+	if (!text) return false;
+	return !HIDDEN_BOOK_TAGS.has(text.toLowerCase());
+}
+
 function normalizeTagList(field){
 	const out = [];
 	if (Array.isArray(field)) {
 		for (const val of field){
 			if (typeof val !== "string") continue;
 			const trimmed = val.trim();
-			if (trimmed) out.push(trimmed);
+			if (trimmed && isPublicBookTag(trimmed)) out.push(trimmed);
 		}
 	} else if (typeof field === "string") {
 		const trimmed = field.trim();
-		if (trimmed) out.push(trimmed);
+		if (trimmed && isPublicBookTag(trimmed)) out.push(trimmed);
 	}
 	return out;
 }
@@ -2292,6 +2300,10 @@ function renderFilterOptions(records){
 
 	filterCountryOptions = buildCountryFilterOptions(records);
 	syncCountryFilterInput();
+
+	for (const tag of listFilterTags){
+		if (!isPublicBookTag(tag)) listFilterTags.delete(tag);
+	}
 
 	const tags = computeAllTags(records);
 	filterTagsEl.innerHTML = tags.map((tag, idx) => {
