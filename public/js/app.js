@@ -796,9 +796,31 @@ function getChatStackEl(){
 	return chatRoot || chatShell;
 }
 
+function measureTopBarNaturalHeight(el){
+	if (!el) return 0;
+	el.style.minHeight = "0";
+	const h = el.getBoundingClientRect().height;
+	el.style.minHeight = "";
+	return h;
+}
+
 function updateOverlayCssVars(){
-	const headerH = atlasHeader ? Math.ceil(atlasHeader.getBoundingClientRect().height) + 20 : 72;
-	document.documentElement.style.setProperty("--atlas-overlays-top", `${headerH}px`);
+	const viewControls = document.getElementById("atlas-view-controls");
+	const barH = Math.ceil(Math.max(
+		measureTopBarNaturalHeight(atlasHeader),
+		measureTopBarNaturalHeight(viewControls)
+	));
+
+	if (barH > 0){
+		document.documentElement.style.setProperty("--atlas-top-bar-h", `${barH}px`);
+	}
+
+	const headerRect = atlasHeader ? atlasHeader.getBoundingClientRect() : null;
+	const controlsRect = viewControls ? viewControls.getBoundingClientRect() : null;
+	const bottomY = Math.max(headerRect?.bottom || 0, controlsRect?.bottom || 0);
+	const overlaysTop = bottomY > 0 ? Math.ceil(bottomY) + 4 : 72;
+	document.documentElement.style.setProperty("--atlas-overlays-top", `${overlaysTop}px`);
+
 	const chatStackEl = getChatStackEl();
 	if (chatStackEl){
 		document.documentElement.style.setProperty("--atlas-chat-h", `${Math.ceil(chatStackEl.getBoundingClientRect().height)}px`);
@@ -2729,6 +2751,16 @@ function setupListView(){
 }
 
 setupListView();
+
+function setupTopBarSync(){
+	updateOverlayCssVars();
+	if (typeof ResizeObserver === "undefined") return;
+	const viewControls = document.getElementById("atlas-view-controls");
+	const topBarObserver = new ResizeObserver(() => updateOverlayCssVars());
+	if (atlasHeader) topBarObserver.observe(atlasHeader);
+	if (viewControls) topBarObserver.observe(viewControls);
+}
+setupTopBarSync();
 
 function dismissAppBanner(){
 	if (!appBanner) return;
