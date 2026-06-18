@@ -262,6 +262,11 @@ body.atlas-chat-expanded .atlas-info {
 	background: #eee;
 }
 .atlas-book-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.atlas-info .atlas-book-editor-pick {
+	font-size: 9px;
+	padding: 3px 8px;
+	align-self: flex-start;
+}
 .atlas-book-title {
 	font-family: Georgia, "Palatino Linotype", Palatino, "Times New Roman", Times, serif;
 	font-weight: 700; color: #111; font-size: 13px; line-height: 1.2;
@@ -1318,6 +1323,16 @@ body:not(.atlas-view-list) .atlas-filter {
 .atlas-filter-chip.is-selected {
 	border-color: var(--tag-color, #301900);
 	background: color-mix(in srgb, var(--tag-color, #301900) 10%, white);
+}
+.atlas-filter-chip--editors-pick {
+	--tag-color: #301900;
+	border-color: #301900;
+	color: #301900;
+	text-transform: none;
+}
+.atlas-filter-chip--editors-pick.is-selected {
+	border-color: #301900;
+	background: color-mix(in srgb, #301900 10%, white);
 }
 
 /* ─────────── Full-page list view ─────────── */

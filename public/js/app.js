@@ -465,10 +465,14 @@ function renderBookListRow(it, idx){
 	const author = String(it.author || "").trim() || "Unknown";
 	const cover = String(it.cover_url || "").trim() || PLACEHOLDER_COVER;
 	const safeAlt = `Cover of '${title}'`;
+	const editorPickHtml = isEditorsPick(it)
+		? `<div class="atlas-book-editor-pick">${escapeHtml(EDITORS_PICK_LABEL)}</div>`
+		: "";
 	return `
    <div class="atlas-book" data-idx="${idx}">
   <img class="atlas-book-cover" src="${cover}" alt="${escapeHtml(safeAlt)}" loading="lazy">
   <div class="atlas-book-meta">
+   ${editorPickHtml}
  <div class="atlas-book-title">${escapeHtml(title)}</div>
  <div class="atlas-book-author">${escapeHtml(author)}</div>
   </div>
@@ -2387,7 +2391,7 @@ function renderFilterOptions(records){
 	}
 
 	const tags = computeAllTags(records);
-	const editorsPickChip = `<button type="button" class="atlas-filter-chip${listFilterEditorsPick ? " is-selected" : ""}" data-editors-pick="1" style="--tag-color:${BOOK_TAG_COLORS[0]};">${escapeHtml(EDITORS_PICK_LABEL)}</button>`;
+	const editorsPickChip = `<button type="button" class="atlas-filter-chip atlas-filter-chip--editors-pick${listFilterEditorsPick ? " is-selected" : ""}" data-editors-pick="1">${escapeHtml(EDITORS_PICK_LABEL)}</button>`;
 	const tagChips = tags.map((tag, idx) => {
 		const selected = listFilterTags.has(tag);
 		const color = BOOK_TAG_COLORS[(idx + 1) % BOOK_TAG_COLORS.length];
