@@ -19,6 +19,13 @@
 		</script>
 	</head>
 	<body>
+		<script>
+			try {
+				if (localStorage.getItem("atlas_view_mode_v1") === "list") {
+					document.body.classList.add("atlas-view-list");
+				}
+			} catch (_) {}
+		</script>
 		<header class="atlas-header" aria-label="Map title">
 			<a class="atlas-home"
 				href="https://ponder-app.ai/"

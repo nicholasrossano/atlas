@@ -2654,8 +2654,7 @@ function setupListView(){
 			if (saved === "list") setViewMode("list");
 		} catch {}
 	};
-	if (map.loaded()) restoreSavedView();
-	else map.once("load", restoreSavedView);
+	restoreSavedView();
 
 	viewMapBtn.addEventListener("click", () => {
 		toggleFilterPanel(false);
