@@ -586,6 +586,25 @@ function bookGoogleBooksUrl(book){
 	return "";
 }
 
+function buildBookActionButtonsHtml(book, options = {}){
+	const listMode = options.list === true;
+	const rawBuyUrl = String(book.bookshop_url || "").trim();
+	const googleUrl = bookGoogleBooksUrl(book);
+	if (!rawBuyUrl && !googleUrl) return "";
+
+	const buyCls = listMode ? "atlas-book-buy atlas-list-book-buy" : "atlas-book-buy";
+	const googleCls = listMode ? "atlas-book-google atlas-list-book-google" : "atlas-book-google";
+	const parts = [];
+	if (googleUrl){
+		parts.push(`<a class="${googleCls}" href="${escapeHtml(googleUrl)}" target="_blank" rel="noopener">Google Books</a>`);
+	}
+	if (rawBuyUrl){
+		parts.push(`<a class="${buyCls}" href="${escapeHtml(rawBuyUrl)}" target="_blank" rel="noopener">Buy</a>`);
+	}
+	const actionsCls = listMode ? "atlas-book-actions atlas-list-book-action-buttons" : "atlas-book-actions";
+	return `<div class="${actionsCls}">${parts.join("")}</div>`;
+}
+
 function getBookDisplayBlurb(book){
 	const summary = String(book?.summary || "").trim();
 	if (summary) return { text: summary, source: "custom" };
@@ -641,14 +660,8 @@ function buildBookDetailHtml(book){
 	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
 	const safeAlt = `Cover of '${title}'`;
 	const summaryHtml = buildBookBlurbHtml(book);
-	const rawBuyUrl = String(book.bookshop_url || "").trim();
-	const hasBuy = rawBuyUrl.length > 0;
+	const actionButtonsHtml = buildBookActionButtonsHtml(book);
 	const tags = Array.isArray(book.tags) ? book.tags : [];
-
-	let buyButtonHtml = "";
-	if (hasBuy){
-		buyButtonHtml = `<a class="atlas-book-buy" href="${escapeHtml(rawBuyUrl)}" target="_blank" rel="noopener">Buy</a>`;
-	}
 
 	let editorPickHtml = "";
 	if (isEditorsPick(book)){
@@ -672,7 +685,7 @@ function buildBookDetailHtml(book){
    <div class="atlas-book-detail-author">${escapeHtml(author)}</div>
    ${tagsHtml}
   </div>
-  ${buyButtonHtml}
+  ${actionButtonsHtml}
   </div>
    </div>
   </div>
@@ -708,24 +721,21 @@ function renderListViewBookRow(book, idx, iso, isExpanded){
 		? `<div class="atlas-book-editor-pick">${escapeHtml(EDITORS_PICK_LABEL)}</div>`
 		: "";
 	const expandable = bookHasExpandableContent(book);
-	const rawBuyUrl = String(book.bookshop_url || "").trim();
-	const hasBuy = rawBuyUrl.length > 0;
+	const actionButtonsHtml = buildBookActionButtonsHtml(book, { list: true });
+	const hasActionButtons = actionButtonsHtml.length > 0;
 	const expandedClass = expandable && isExpanded ? " is-expanded" : "";
 	const staticClass = expandable ? "" : " is-static";
 	const ariaExpanded = expandable && isExpanded ? "true" : "false";
 	const bookAttrs = expandable
 		? `role="button" tabindex="0" aria-expanded="${ariaExpanded}"`
 		: "";
-	const hasActions = expandable || hasBuy;
+	const hasActions = expandable || hasActionButtons;
 	const bookActionClass = hasActions ? " atlas-book-has-actions" : "";
-	const buyHtml = hasBuy
-		? `<a class="atlas-book-buy atlas-list-book-buy" href="${escapeHtml(rawBuyUrl)}" target="_blank" rel="noopener">Buy</a>`
-		: "";
 	const chevronHtml = expandable
 		? `<span class="atlas-list-book-chevron" aria-hidden="true"></span>`
 		: "";
 	const actionsHtml = hasActions
-		? `<div class="atlas-list-book-actions">${chevronHtml}${buyHtml}</div>`
+		? `<div class="atlas-list-book-actions">${chevronHtml}${actionButtonsHtml}</div>`
 		: "";
 	const panelHtml = expandable
 		? `<div class="atlas-list-book-panel-wrap">

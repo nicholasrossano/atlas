@@ -464,11 +464,21 @@ body.atlas-chat-expanded .atlas-info {
 	white-space: nowrap;
 }
 
-.atlas-book-buy {
+.atlas-book-actions {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 8px;
 	align-self: flex-end;
-	margin-top: 0;
-	margin-right: 0;
-	margin-bottom: 0;
+	margin-top: auto;
+	max-width: 100%;
+}
+
+.atlas-book-buy,
+.atlas-book-google {
+	margin: 0;
 	padding: 7px 18px;
 	border-radius: 999px;
 	text-decoration: none;
@@ -480,7 +490,8 @@ body.atlas-chat-expanded .atlas-info {
 	white-space: nowrap;
 	max-width: 100%;
 }
-.atlas-book-buy:hover {
+.atlas-book-buy:hover,
+.atlas-book-google:hover {
 	background: #000;
 }
 
@@ -1506,9 +1517,12 @@ body.atlas-view-list .atlas-list-view {
 	flex: 0 0 auto;
 	min-height: var(--atlas-list-cover-h);
 }
-.atlas-list-book-buy {
-	margin: 0;
+.atlas-list-book-action-buttons {
 	margin-top: auto;
+}
+
+.atlas-list-book-buy,
+.atlas-list-book-google {
 	padding: 6px 14px;
 	font-size: 10px;
 	flex: 0 0 auto;

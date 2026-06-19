@@ -76,3 +76,4 @@ bash scripts/prepare_functions_venv.sh
 
 - `python functions/scripts/audit_country_override.py --dry-run`
 - `python functions/scripts/audit_bookshop_urls.py`
+- `GOOGLE_BOOKS_API_KEY=... python functions/scripts/backfill_google_books.py --only-missing-link --apply`
