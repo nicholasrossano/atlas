@@ -27,11 +27,10 @@ This atlas connects queer readers to queer literature through an interactive map
 
 Future plans include:
 
-- **Richer book detail pages** (additional metadata, themes, content notes, reviews, and reading levels).
-- **Smarter assistant** (better recommendations, improved filtering, and more nuanced guidance).
-- **More dynamic mapping** (filters, layers, and smarter geo-grouping).
-- **Bigger library** (keep expanding the catalog of queer literature).
-- **Broader categories** (potentially adding new top-level collections beyond LGBTQ literature).
+- **Richer book detail pages:** additional metadata, themes, content notes, reviews, and reading levels.
+- **Smarter assistant:** better recommendations, improved filtering, and more nuanced guidance.
+- **More dynamic mapping:** filters, layers, and smarter geo-grouping.
+- **Bigger library:** keep expanding the catalog of queer literature.
 
 ## Contributions
 
