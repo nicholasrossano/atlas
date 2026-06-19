@@ -4,15 +4,15 @@ This atlas connects queer readers to queer literature through an interactive map
 
 ## Screenshots
 
-**Map** — browse books by country on the interactive map.
+**Map:** browse books by country on the interactive map.
 
 ![Browse books by country on the map](docs/screenshots/map-country-books.png)
 
-**Curator** — ask for recommendations tailored to themes, settings, and identity.
+**Curator:** ask for recommendations tailored to themes, settings, and identity.
 
 ![Ask the Curator for recommendations](docs/screenshots/curator-recommendation.png)
 
-**List** — explore the catalog with country grouping and tag filters.
+**List:** explore the catalog with country grouping and tag filters.
 
 ![Browse the catalog in list view](docs/screenshots/list-browse-by-country.png)
 
