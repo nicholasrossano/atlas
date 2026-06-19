@@ -2,7 +2,14 @@
 
 This atlas connects queer readers to queer literature through an interactive map and an AI assistant. The assistant helps readers discover books, authors, and stories that resonate, while the map makes it easy to explore titles from around the world. You can check out the [live map here](https://map.ponder-app.ai).
 
-## Screenshots
+## Overview
+
+- **AI-guided discovery:** An assistant that helps readers find LGBTQ+ books and authors based on interests, identity, and vibe.
+- **Map-first exploration:** Browse literature spatially to surface local voices, settings, and queer communities.
+- **Community powered:** Anyone can suggest new books for inclusion. Our current library is based on our own libraries, personal recommendations, and community submissions.
+- **AI-driven features:** We used genAI to write summaries about what is specifically queer about the book to help readers know what to expect.
+
+## Preview
 
 **Map:** browse books by country on the interactive map.
 
@@ -15,13 +22,6 @@ This atlas connects queer readers to queer literature through an interactive map
 **List:** explore the catalog with country grouping and tag filters.
 
 ![Browse the catalog in list view](docs/screenshots/list-browse-by-country.png)
-
-## Overview
-
-- **AI-guided discovery:** An assistant that helps readers find LGBTQ+ books and authors based on interests, identity, and vibe.
-- **Map-first exploration:** Browse literature spatially to surface local voices, settings, and queer communities.
-- **Community powered:** Anyone can suggest new books for inclusion. Our current library is based on our own libraries, personal recommendations, and community submissions.
-- **AI-driven features:** We used genAI to write summaries about what is specifically queer about the book to help readers know what to expect.
 
 ## Roadmap
 
