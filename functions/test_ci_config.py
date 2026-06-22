@@ -58,6 +58,11 @@ class CIConfigTests(unittest.TestCase):
 		self.assertIn("apiKey", content)
 		self.assertIn("styleId", content)
 
+	def test_workflows_run_frontend_cover_url_tests(self):
+		for workflow in WORKFLOW_FILES:
+			content = workflow.read_text()
+			self.assertIn("test_cover_url.js", content, f"{workflow.name} must run cover URL tests")
+
 
 if __name__ == "__main__":
 	unittest.main()

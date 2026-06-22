@@ -1,7 +1,9 @@
 // Atlas/public/js/app.js
 
+import { coverUrlForDisplay } from "./cover-url.js";
+
 // ─────────── Section Header ───────────
-console.log("[atlas] app.js v47 booting");
+console.log("[atlas] app.js v48 booting");
 
 // ─────────── Section Header ───────────
 const atlasConfig = window.ATLAS_CONFIG || {};
@@ -245,6 +247,11 @@ const PLACEHOLDER_COVER = 'data:image/svg+xml;utf8,' + encodeURIComponent(
 	`<svg xmlns="http://www.w3.org/2000/svg" width="68" height="102"><rect width="100%" height="100%" fill="#eae7df"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="system-ui" font-size="10" fill="#888">No Cover</text></svg>`
 );
 
+function displayCoverUrl(url){
+	const normalized = coverUrlForDisplay(url);
+	return normalized || PLACEHOLDER_COVER;
+}
+
 // ─────────── Book catalog (server-side Firestore via Cloud Function) ───────────
 let _allBooksPromise = null;
 const _booksByIsoCache = new Map();
@@ -467,7 +474,7 @@ function updateBookCountLabel(count){
 function renderBookListRow(it, idx){
 	const title = String(it.title || "").trim() || "Untitled";
 	const author = String(it.author || "").trim() || "Unknown";
-	const cover = String(it.cover_url || "").trim() || PLACEHOLDER_COVER;
+	const cover = displayCoverUrl(it.cover_url);
 	const safeAlt = `Cover of '${title}'`;
 	const editorPickHtml = isEditorsPick(it)
 		? `<div class="atlas-book-editor-pick">${escapeHtml(EDITORS_PICK_LABEL)}</div>`
@@ -661,7 +668,7 @@ function buildBookTagsHtml(tags){
 function buildBookDetailHtml(book){
 	const title = String(book.title || "").trim() || "Untitled";
 	const author = String(book.author || "").trim() || "Unknown";
-	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
+	const cover = displayCoverUrl(book.cover_url);
 	const safeAlt = `Cover of '${title}'`;
 	const summaryHtml = buildBookBlurbHtml(book);
 	const actionButtonsHtml = buildBookActionButtonsHtml(book);
@@ -718,7 +725,7 @@ function buildBookExpandPanelHtml(book){
 function renderListViewBookRow(book, idx, iso, isExpanded){
 	const title = String(book.title || "").trim() || "Untitled";
 	const author = String(book.author || "").trim() || "Unknown";
-	const cover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
+	const cover = displayCoverUrl(book.cover_url);
 	const safeAlt = `Cover of '${title}'`;
 	const tagsHtml = buildBookTagsHtml(book.tags);
 	const editorPickHtml = isEditorsPick(book)
@@ -2065,7 +2072,7 @@ function renderRecommendationCards(container, recs, apiBooks){
 			if (!book) return;
 			const safeTitle = String(book.title || "").trim() || "Untitled";
 			const safeAuthor = String(book.author || "").trim() || "Unknown";
-			const safeCover = String(book.cover_url || "").trim() || PLACEHOLDER_COVER;
+			const safeCover = displayCoverUrl(book.cover_url);
 			title.textContent = safeTitle;
 			author.textContent = safeAuthor;
 			cover.src = safeCover;

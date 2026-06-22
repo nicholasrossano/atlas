@@ -22,6 +22,8 @@ jobs:
         run: |
           python -m unittest test_atlas_chat.py test_ci_config.py
         working-directory: functions
+      - name: Run frontend cover URL tests
+        run: node public/js/test_cover_url.js
       - name: Verify functions deploy readiness
         run: bash scripts/prepare_functions_venv.sh
 
