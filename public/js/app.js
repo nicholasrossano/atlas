@@ -2197,16 +2197,25 @@ let listExpandedBookId = null;
 let listScrollToBookId = null;
 let filterCountryOptions = [];
 
-function buildCountryFilterOptions(records){
-	return computeOverrideIsoList(records).map(iso => ({
-		iso,
-		name: fullCountryName(iso)
-	})).sort((a, b) => a.name.localeCompare(b.name));
+function buildCountryFilterOptions(){
+	return listIso2Codes()
+		.filter(iso => iso !== "AQ")
+		.map(iso => {
+			const code = iso.toUpperCase();
+			return { iso: code, name: fullCountryName(code) };
+		})
+		.filter(entry => entry.name && entry.name !== entry.iso)
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function ensureCountryFilterOptions(){
+	if (!filterCountryOptions.length) filterCountryOptions = buildCountryFilterOptions();
 }
 
 function countryFilterMatches(query){
 	const q = String(query || "").trim().toLowerCase();
 	if (!q) return [];
+	ensureCountryFilterOptions();
 	const matches = filterCountryOptions.filter(entry =>
 		entry.name.toLowerCase().includes(q) || entry.iso.toLowerCase().includes(q)
 	);
@@ -2393,7 +2402,7 @@ function renderListSummary(){
 function renderFilterOptions(records){
 	if (!filterTagsEl) return;
 
-	filterCountryOptions = buildCountryFilterOptions(records);
+	ensureCountryFilterOptions();
 	syncCountryFilterInput();
 
 	for (const tag of listFilterTags){
