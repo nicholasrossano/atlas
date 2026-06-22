@@ -2213,7 +2213,12 @@ function buildCountryFilterOptions(){
 }
 
 function ensureCountryFilterOptions(){
-	if (!filterCountryOptions.length) filterCountryOptions = buildCountryFilterOptions();
+	if (filterCountryOptions.length) return;
+	try {
+		filterCountryOptions = buildCountryFilterOptions();
+	} catch (err) {
+		console.error("[atlas] country filter options failed:", err);
+	}
 }
 
 function countryFilterMatches(query){
@@ -2406,7 +2411,6 @@ function renderListSummary(){
 function renderFilterOptions(records){
 	if (!filterTagsEl) return;
 
-	ensureCountryFilterOptions();
 	syncCountryFilterInput();
 
 	for (const tag of listFilterTags){
