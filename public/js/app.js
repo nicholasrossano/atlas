@@ -321,9 +321,13 @@ function normalizeCountryToken(value){
 let _countryNameToIso2Cache = null;
 
 function listIso2Codes(){
-	if (typeof Intl.supportedValuesOf === "function") {
-		return Intl.supportedValuesOf("region").filter(code => typeof code === "string" && code.length === 2);
-	}
+	try {
+		if (typeof Intl.supportedValuesOf === "function") {
+			const codes = Intl.supportedValuesOf("region").filter(code => typeof code === "string" && code.length === 2);
+			if (codes.length) return codes;
+		}
+	} catch (_) {}
+
 	const out = [];
 	for (let i = 65; i <= 90; i++) {
 		for (let j = 65; j <= 90; j++) {
