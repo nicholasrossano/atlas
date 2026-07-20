@@ -77,3 +77,7 @@ bash scripts/prepare_functions_venv.sh
 - `python functions/scripts/audit_country_override.py --dry-run`
 - `python functions/scripts/audit_bookshop_urls.py`
 - `GOOGLE_BOOKS_API_KEY=... python functions/scripts/backfill_google_books.py --only-missing-link --apply`
+
+## Spreadsheet → Firestore sync (automated)
+
+Daily catalog sync from the curator Google Sheet runs in the **Ponder** repo as Cloud Function `sync_atlas_books` (06:00 America/New_York). Implementation: `Ponder/functions/atlas_books_backfill.py`. Manual run: `python scripts/backfill_atlas_books.py` from Ponder. Unchanged rows are skipped; OpenAI cost only hits on newly inserted books.
